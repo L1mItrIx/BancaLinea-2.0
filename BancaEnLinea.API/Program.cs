@@ -10,22 +10,26 @@ var builder = WebApplication.CreateBuilder(args);
 // Configurar CORS
 builder.Services.AddCors(options =>
 {
-  options.AddPolicy("AllowAllOrigins",
-      policy =>
-      {
-        policy.AllowAnyOrigin()
-                .AllowAnyMethod()
-                .AllowAnyHeader();
-      });
+    options.AddPolicy("AllowAllOrigins",
+        policy =>
+        {
+            policy.AllowAnyOrigin()
+                  .AllowAnyMethod()
+                  .AllowAnyHeader();
+        });
 });
 
 // Configurar DbContext
 builder.Services.AddDbContext<BancaEnLineaContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// Registrar servicios
+// Registrar servicios de Cuenta
 builder.Services.AddTransient<IGestionCuentaBW, GestionCuentaBW>();
 builder.Services.AddTransient<IGestionCuentaDA, GestionCuentaDA>();
+
+// Registrar servicios de CuentaBancaria
+builder.Services.AddTransient<IGestionCuentaBancariaBW, GestionCuentaBancariaBW>();
+builder.Services.AddTransient<IGestionCuentaBancariaDA, GestionCuentaBancariaDA>();
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
@@ -37,8 +41,8 @@ app.UseCors("AllowAllOrigins");
 
 if (app.Environment.IsDevelopment())
 {
-  app.UseSwagger();
-  app.UseSwaggerUI();
+    app.UseSwagger();
+    app.UseSwaggerUI();
 }
 
 app.UseHttpsRedirection();

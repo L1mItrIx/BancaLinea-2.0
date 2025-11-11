@@ -1,4 +1,5 @@
 using BancaEnLinea.BC.Modelos;
+using BancaEnLinea.DA.Entidades;
 using Microsoft.EntityFrameworkCore;
 
 namespace BancaEnLinea.DA.Config
@@ -11,7 +12,11 @@ namespace BancaEnLinea.DA.Config
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-
+            modelBuilder.Entity<CuentaBancariaDA>()
+            .HasOne(cb => cb.Cuenta)
+            .WithMany()
+            .HasForeignKey(cb => cb.IdCuenta)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 
   }
