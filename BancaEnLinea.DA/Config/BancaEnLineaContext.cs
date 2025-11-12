@@ -9,8 +9,9 @@ namespace BancaEnLinea.DA.Config
     public BancaEnLineaContext(DbContextOptions<BancaEnLineaContext> options) : base(options) { }
 
     public DbSet<Cuenta> Cuenta { get; set; }
+    public DbSet<CuentaBancariaDA> CuentaBancaria { get; set; }
 
-    protected override void OnModelCreating(ModelBuilder modelBuilder)
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
             modelBuilder.Entity<CuentaBancariaDA>()
             .HasOne(cb => cb.Cuenta)

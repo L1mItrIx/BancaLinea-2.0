@@ -5,6 +5,6 @@
         Ahorros = 0,
         Corriente = 1,
         Inversion = 2,
-        Plaza fijo = 3
+        PlazoFijo = 3
     }
 }
