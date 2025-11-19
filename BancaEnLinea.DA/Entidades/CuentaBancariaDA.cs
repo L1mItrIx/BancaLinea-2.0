@@ -1,10 +1,12 @@
 ﻿using BancaEnLinea.BC.Enums;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using Microsoft.EntityFrameworkCore;
 
 namespace BancaEnLinea.DA.Entidades
 {
     [Table("CuentaBancaria")]
+    [Index(nameof(NumeroTarjeta), IsUnique = true)]
     public class CuentaBancariaDA
     {
         [Key]

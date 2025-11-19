@@ -1,4 +1,4 @@
-using BancaEnLinea.BW.CU;
+﻿using BancaEnLinea.BW.CU;
 using BancaEnLinea.BW.Interfaces.BW;
 using BancaEnLinea.BW.Interfaces.DA;
 using BancaEnLinea.DA.Acciones;
@@ -31,12 +31,21 @@ builder.Services.AddTransient<IGestionCuentaDA, GestionCuentaDA>();
 builder.Services.AddTransient<IGestionCuentaBancariaBW, GestionCuentaBancariaBW>();
 builder.Services.AddTransient<IGestionCuentaBancariaDA, GestionCuentaBancariaDA>();
 
+// Registrar servicios de Beneficiario
+builder.Services.AddTransient<IGestionBeneficiarioBW, GestionBeneficiarioBW>();
+builder.Services.AddTransient<IGestionBeneficiarioDA, GestionBeneficiarioDA>();
+
+// Registrar servicios de Transferencia
+builder.Services.AddTransient<IGestionTransferenciaBW, GestionTransferenciaBW>();
+builder.Services.AddTransient<IGestionTransferenciaDA, GestionTransferenciaDA>();
+
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
 
+// ⬅️ IMPORTANTE: CORS PRIMERO
 app.UseCors("AllowAllOrigins");
 
 if (app.Environment.IsDevelopment())
@@ -48,4 +57,5 @@ if (app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 app.UseAuthorization();
 app.MapControllers();
+
 app.Run();

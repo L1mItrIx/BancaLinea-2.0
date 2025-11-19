@@ -8,6 +8,7 @@ namespace BancaEnLinea.BW.Interfaces.DA
         Task<List<Cuenta>> obtenerCuentas();
         Task<bool> actualizarCuenta(Cuenta cuenta, int id);
         Task<bool> eliminarCuenta(int id);
-        Task<bool> validarCuenta(string correo, string contrasena);
+        Task<Cuenta?> validarCuenta(string correo, string contrasena);
+        Task<Cuenta?> obtenerCuentaPorId(int id);
   }
 }

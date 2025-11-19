@@ -11,7 +11,7 @@ namespace BancaEnLinea.DA.Entidades
       [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
       public int Id { get; set; }
       [Required]
-      public int Cedula { get; set; }
+      public long Telefono { get; set; }
       [Required]
       public string Nombre { get; set; }
       [Required]

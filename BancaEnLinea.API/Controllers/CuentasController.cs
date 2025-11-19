@@ -1,6 +1,7 @@
 using BancaEnLinea.BC.Modelos;
 using BancaEnLinea.BW.Interfaces.BW;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Identity.Data;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Cryptography.Xml;
 
@@ -42,7 +43,7 @@ namespace BancaEnLinea.API.Controllers
         return StatusCode(500, $"Error interno en el servidor: {ex.Message}");
       }
     }
-    [HttpPut("{id}", Name ="ActualizarCuenta")]
+    [HttpPut("ActualizarCuenta/{id}")]
     public async Task<ActionResult> actualizarCuenta([FromBody] Cuenta cuenta, int id)
     {
       var resultado = await gestionCuentaBW.actualizarCuenta(cuenta, id);
@@ -55,7 +56,7 @@ namespace BancaEnLinea.API.Controllers
         return StatusCode(500, $"Error interno en el servidor: {ex.Message}");
       }
     }
-    [HttpDelete("{id}", Name = "EliminarCuenta")]
+    [HttpDelete("EliminarCuenta/{id}")]
     public async Task<ActionResult> eliminarCuenta(int id)
     {
       var resultado = await gestionCuentaBW.eliminarCuenta(id);
@@ -68,18 +69,46 @@ namespace BancaEnLinea.API.Controllers
         return StatusCode(500, $"Error interno en el servidor: {ex.Message}");
       }
     }
-    [HttpPost("ValidarCuenta")]
-    public async Task<ActionResult> validarCuenta([FromBody] Cuenta cuenta)
-    {
-      var resultado = await gestionCuentaBW.validarCuenta(cuenta.Correo, cuenta.Contrasena);
-      try
-      {
-        return Ok(resultado);
-      }
-      catch (Exception ex)
-      {
-        return StatusCode(500, $"Error interno en el servidor: {ex.Message}");
-      }
+        [HttpPost("ValidarCuenta")]
+        public async Task<ActionResult> validarCuenta([FromBody] BancaEnLinea.BC.Modelos.LoginRequest loginRequest)
+        {
+            try
+            {
+                var cuentaUsuario = await gestionCuentaBW.validarCuenta(loginRequest.Correo, loginRequest.Contrasena);
+
+                if (cuentaUsuario != null)
+                {
+                    return Ok(new
+                    {
+                        success = true,
+                        message = "Inicio de sesión exitoso",
+                        data = new
+                        {
+                            id = cuentaUsuario.Id,
+                            telefono = cuentaUsuario.Telefono,
+                            nombre = cuentaUsuario.Nombre,
+                            primerApellido = cuentaUsuario.PrimerApellido,
+                            segundoApellido = cuentaUsuario.SegundoApellido,
+                            correo = cuentaUsuario.Correo,
+                            rol = cuentaUsuario.Rol
+                        }
+                    });
+                }
+
+                return Unauthorized(new
+                {
+                    success = false,
+                    message = "Correo o contraseña incorrectos"
+                });
+            }
+            catch (Exception excepcion)
+            {
+                return StatusCode(500, new
+                {
+                    success = false,
+                    message = $"Error interno: {excepcion.Message}"
+                });
+            }
+        }
     }
-  }
 }

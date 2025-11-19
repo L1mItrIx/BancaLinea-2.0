@@ -15,68 +15,95 @@ namespace BancaEnLinea.DA.Acciones
             this.bancaEnLineaContext = bancaEnLineaContext;
         }
 
-        public async Task<bool> registrarCuentaBancaria(CuentaBancaria cuentaBancaria, int idCuenta)
+        public async Task<bool> registrarCuentaBancaria(CuentaBancaria cuentaBancaria, int identificadorCuenta)
         {
             try
             {
-                var cuentaBancariaDA = new CuentaBancariaDA
+                // Mapear de CuentaBancaria (modelo de negocio) a CuentaBancariaDA (entidad)
+                var cuentaBancariaEntidad = new CuentaBancariaDA
                 {
                     NumeroTarjeta = cuentaBancaria.NumeroTarjeta,
                     Tipo = cuentaBancaria.Tipo,
                     Moneda = cuentaBancaria.Moneda,
                     Saldo = cuentaBancaria.Saldo,
                     Estado = cuentaBancaria.Estado,
-                    IdCuenta = idCuenta
+                    IdCuenta = identificadorCuenta
                 };
 
-                bancaEnLineaContext.CuentaBancaria.Add(cuentaBancariaDA);
+                bancaEnLineaContext.CuentaBancaria.Add(cuentaBancariaEntidad);
                 await bancaEnLineaContext.SaveChangesAsync();
                 return true;
             }
-            catch (Exception)
+            catch (Exception excepcion)
             {
                 return false;
             }
         }
 
-        public async Task<List<CuentaBancaria>> obtenerCuentasBancarias(int idCuenta)
+        public async Task<List<CuentaBancaria>> obtenerCuentasBancarias(int identificadorCuenta)
         {
-            var cuentasDA = await bancaEnLineaContext.CuentaBancaria
-              .Where(cb => cb.IdCuenta == idCuenta)
-              .AsNoTracking()
-              .ToListAsync();
+            var cuentasBancariasDeBaseDeDatos = await bancaEnLineaContext.CuentaBancaria
+                .Where(cuentaBancariaEntidad => cuentaBancariaEntidad.IdCuenta == identificadorCuenta)
+                .Include(cb => cb.Cuenta)
+                .AsNoTracking()
+                .ToListAsync();
 
-            return cuentasDA.Select(cb => new CuentaBancaria
+            // Mapear de CuentaBancariaDA (entidad) a CuentaBancaria (modelo de negocio)
+            return cuentasBancariasDeBaseDeDatos.Select(cuentaBancariaEntidad => new CuentaBancaria
             {
-                Id = cb.Id,
-                NumeroTarjeta = cb.NumeroTarjeta,
-                Tipo = cb.Tipo,
-                Moneda = cb.Moneda,
-                Saldo = cb.Saldo,
-                Estado = cb.Estado
+                Id = cuentaBancariaEntidad.Id,
+                NumeroTarjeta = cuentaBancariaEntidad.NumeroTarjeta,
+                Tipo = cuentaBancariaEntidad.Tipo,
+                Moneda = cuentaBancariaEntidad.Moneda,
+                Saldo = cuentaBancariaEntidad.Saldo,
+                Estado = cuentaBancariaEntidad.Estado,
+                IdCuenta = cuentaBancariaEntidad.IdCuenta,
+                Cuenta = cuentaBancariaEntidad.Cuenta != null ? new Cuenta
+                {
+                    Id = cuentaBancariaEntidad.Cuenta.Id,
+                    Nombre = cuentaBancariaEntidad.Cuenta.Nombre,
+                    PrimerApellido = cuentaBancariaEntidad.Cuenta.PrimerApellido,
+                    SegundoApellido = cuentaBancariaEntidad.Cuenta.SegundoApellido,
+                    Correo = cuentaBancariaEntidad.Cuenta.Correo,
+                    Telefono = cuentaBancariaEntidad.Cuenta.Telefono,
+                    Rol = cuentaBancariaEntidad.Cuenta.Rol
+                } : null
             }).ToList();
         }
 
         public async Task<List<CuentaBancaria>> obtenerTodasLasCuentasBancarias()
         {
-            var cuentasDA = await bancaEnLineaContext.CuentaBancaria
-              .AsNoTracking()
-              .ToListAsync();
+            var cuentasBancariasDeBaseDeDatos = await bancaEnLineaContext.CuentaBancaria
+                .Include(cb => cb.Cuenta)
+                .AsNoTracking()
+                .ToListAsync();
 
-            return cuentasDA.Select(cb => new CuentaBancaria
+            // Mapear de CuentaBancariaDA (entidad) a CuentaBancaria (modelo de negocio)
+            return cuentasBancariasDeBaseDeDatos.Select(cuentaBancariaEntidad => new CuentaBancaria
             {
-                Id = cb.Id,
-                NumeroTarjeta = cb.NumeroTarjeta,
-                Tipo = cb.Tipo,
-                Moneda = cb.Moneda,
-                Saldo = cb.Saldo,
-                Estado = cb.Estado
+                Id = cuentaBancariaEntidad.Id,
+                NumeroTarjeta = cuentaBancariaEntidad.NumeroTarjeta,
+                Tipo = cuentaBancariaEntidad.Tipo,
+                Moneda = cuentaBancariaEntidad.Moneda,
+                Saldo = cuentaBancariaEntidad.Saldo,
+                Estado = cuentaBancariaEntidad.Estado,
+                IdCuenta = cuentaBancariaEntidad.IdCuenta,
+                Cuenta = cuentaBancariaEntidad.Cuenta != null ? new Cuenta
+                {
+                    Id = cuentaBancariaEntidad.Cuenta.Id,
+                    Nombre = cuentaBancariaEntidad.Cuenta.Nombre,
+                    PrimerApellido = cuentaBancariaEntidad.Cuenta.PrimerApellido,
+                    SegundoApellido = cuentaBancariaEntidad.Cuenta.SegundoApellido,
+                    Correo = cuentaBancariaEntidad.Cuenta.Correo,
+                    Telefono = cuentaBancariaEntidad.Cuenta.Telefono,
+                    Rol = cuentaBancariaEntidad.Cuenta.Rol
+                } : null
             }).ToList();
         }
 
-        public async Task<bool> actualizarCuentaBancaria(CuentaBancaria cuentaBancaria, int id)
+        public async Task<bool> actualizarCuentaBancaria(CuentaBancaria cuentaBancaria, int identificador)
         {
-            var cuentaBancariaExistente = await bancaEnLineaContext.CuentaBancaria.FindAsync(id);
+            var cuentaBancariaExistente = await bancaEnLineaContext.CuentaBancaria.FindAsync(identificador);
             if (cuentaBancariaExistente == null)
                 return false;
 
@@ -85,14 +112,15 @@ namespace BancaEnLinea.DA.Acciones
             cuentaBancariaExistente.Moneda = cuentaBancaria.Moneda;
             cuentaBancariaExistente.Saldo = cuentaBancaria.Saldo;
             cuentaBancariaExistente.Estado = cuentaBancaria.Estado;
+            // IdCuenta no se actualiza, se mantiene el original
 
             await bancaEnLineaContext.SaveChangesAsync();
             return true;
         }
 
-        public async Task<bool> eliminarCuentaBancaria(int id)
+        public async Task<bool> eliminarCuentaBancaria(int identificador)
         {
-            var cuentaBancaria = await bancaEnLineaContext.CuentaBancaria.FindAsync(id);
+            var cuentaBancaria = await bancaEnLineaContext.CuentaBancaria.FindAsync(identificador);
             if (cuentaBancaria == null)
                 return false;
 
@@ -101,23 +129,36 @@ namespace BancaEnLinea.DA.Acciones
             return true;
         }
 
-        public async Task<CuentaBancaria?> obtenerCuentaBancariaPorId(int id)
+        public async Task<CuentaBancaria?> obtenerCuentaBancariaPorId(int identificador)
         {
-            var cuentaBancariaDA = await bancaEnLineaContext.CuentaBancaria
-              .AsNoTracking()
-              .FirstOrDefaultAsync(cb => cb.Id == id);
+            var cuentaBancariaEntidad = await bancaEnLineaContext.CuentaBancaria
+                .Include(cb => cb.Cuenta)
+                .AsNoTracking()
+                .FirstOrDefaultAsync(cuentaBancaria => cuentaBancaria.Id == identificador);
 
-            if (cuentaBancariaDA == null)
+            if (cuentaBancariaEntidad == null)
                 return null;
 
+            // Mapear de CuentaBancariaDA (entidad) a CuentaBancaria (modelo de negocio)
             return new CuentaBancaria
             {
-                Id = cuentaBancariaDA.Id,
-                NumeroTarjeta = cuentaBancariaDA.NumeroTarjeta,
-                Tipo = cuentaBancariaDA.Tipo,
-                Moneda = cuentaBancariaDA.Moneda,
-                Saldo = cuentaBancariaDA.Saldo,
-                Estado = cuentaBancariaDA.Estado
+                Id = cuentaBancariaEntidad.Id,
+                NumeroTarjeta = cuentaBancariaEntidad.NumeroTarjeta,
+                Tipo = cuentaBancariaEntidad.Tipo,
+                Moneda = cuentaBancariaEntidad.Moneda,
+                Saldo = cuentaBancariaEntidad.Saldo,
+                Estado = cuentaBancariaEntidad.Estado,
+                IdCuenta = cuentaBancariaEntidad.IdCuenta,
+                Cuenta = cuentaBancariaEntidad.Cuenta != null ? new Cuenta
+                {
+                    Id = cuentaBancariaEntidad.Cuenta.Id,
+                    Nombre = cuentaBancariaEntidad.Cuenta.Nombre,
+                    PrimerApellido = cuentaBancariaEntidad.Cuenta.PrimerApellido,
+                    SegundoApellido = cuentaBancariaEntidad.Cuenta.SegundoApellido,
+                    Correo = cuentaBancariaEntidad.Cuenta.Correo,
+                    Telefono = cuentaBancariaEntidad.Cuenta.Telefono,
+                    Rol = cuentaBancariaEntidad.Cuenta.Rol
+                } : null
             };
         }
     }

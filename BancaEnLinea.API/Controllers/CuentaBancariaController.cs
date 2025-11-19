@@ -32,20 +32,6 @@ namespace BancaEnLinea.API.Controllers
             }
         }
 
-        [HttpGet("ObtenerCuentasBancarias/{idCuenta}")]
-        public async Task<ActionResult> ObtenerCuentasBancarias(int idCuenta)
-        {
-            try
-            {
-                var resultado = await gestionCuentaBancariaBW.obtenerCuentasBancarias(idCuenta);
-                return Ok(resultado);
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, $"Error interno en el servidor: {ex.Message}");
-            }
-        }
-
         [HttpGet("ObtenerTodasLasCuentasBancarias")]
         public async Task<ActionResult> ObtenerTodasLasCuentasBancarias()
         {
@@ -60,7 +46,7 @@ namespace BancaEnLinea.API.Controllers
             }
         }
 
-        [HttpGet("{id}")]
+        [HttpGet("ObtenerCuentaBancaria/{id}")]
         public async Task<ActionResult> ObtenerCuentaBancariaPorId(int id)
         {
             try
@@ -77,7 +63,7 @@ namespace BancaEnLinea.API.Controllers
             }
         }
 
-        [HttpPut("{id}")]
+        [HttpPut("ActualizarCuentaBancaria/{id}")]
         public async Task<ActionResult> ActualizarCuentaBancaria([FromBody] CuentaBancaria cuentaBancaria, int id)
         {
             try
@@ -94,7 +80,7 @@ namespace BancaEnLinea.API.Controllers
             }
         }
 
-        [HttpDelete("{id}")]
+        [HttpDelete("EliminarCuentaBancaria/{id}")]
         public async Task<ActionResult> EliminarCuentaBancaria(int id)
         {
             try

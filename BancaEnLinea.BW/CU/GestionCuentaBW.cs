@@ -5,49 +5,61 @@ using BancaEnLinea.BW.Interfaces.DA;
 
 namespace BancaEnLinea.BW.CU
 {
-  public class GestionCuentaBW : IGestionCuentaBW
-  {
-    private readonly IGestionCuentaDA gestionCuentaDA;
-    public GestionCuentaBW(IGestionCuentaDA gestionCuentaDA)
+    public class GestionCuentaBW : IGestionCuentaBW
     {
-      this.gestionCuentaDA = gestionCuentaDA;
-    }
+        private readonly IGestionCuentaDA gestionCuentaDA;
+        public GestionCuentaBW(IGestionCuentaDA gestionCuentaDA)
+        {
+            this.gestionCuentaDA = gestionCuentaDA;
+        }
 
-    public Task<bool> actualizarCuenta(Cuenta cuenta, int id)
-    {
-      if(!ReglasDeCuenta.elIdEsValido(id) || !ReglasDeCuenta.laCuentaEsValida(cuenta))
-      {
-        return Task.FromResult(false);
-      }
-      return gestionCuentaDA.actualizarCuenta(cuenta, id);
-    }
+        public async Task<bool> registrarCuenta(Cuenta cuenta)
+        {
+            if (!ReglasDeCuenta.laCuentaEsValida(cuenta))
+            {
+                return false;
+            }
 
-    public Task<bool> eliminarCuenta(int id)
-    {
-      return ReglasDeCuenta.elIdEsValido(id) ?
-        gestionCuentaDA.eliminarCuenta(id) :
-        Task.FromResult(false);
-    }
+            var todasLasCuentas = await gestionCuentaDA.obtenerCuentas();
+            //coreo unico
+            bool correoExiste = todasLasCuentas.Any(c =>
+              c.Correo.ToLower().Trim() == cuenta.Correo.ToLower().Trim());
+            if (correoExiste)
+            {
+                return false;
+            }
 
-    public Task<List<Cuenta>> obtenerCuentas()
-    {
-      return gestionCuentaDA.obtenerCuentas();
-    }
+            return await gestionCuentaDA.registrarCuenta(cuenta);
+        }
 
-    public Task<bool> registrarCuenta(Cuenta cuenta)
-    {
-      return ReglasDeCuenta.laCuentaEsValida(cuenta) ?
-        gestionCuentaDA.registrarCuenta(cuenta) :
-        Task.FromResult(false);
-    }
+        public Task<bool> actualizarCuenta(Cuenta cuenta, int id)
+        {
+            if (!ReglasDeCuenta.elIdEsValido(id) || !ReglasDeCuenta.laCuentaEsValida(cuenta))
+            {
+                return Task.FromResult(false);
+            }
+            return gestionCuentaDA.actualizarCuenta(cuenta, id);
+        }
 
-    public Task<bool> validarCuenta(string correo, string contrasena)
-    {
-      if (!ReglasDeCuenta.elCorreoEsValido(correo) || string.IsNullOrEmpty(contrasena))
-      {
-        return Task.FromResult(false);
-      }
-      return gestionCuentaDA.validarCuenta(correo, contrasena);
+        public Task<bool> eliminarCuenta(int id)
+        {
+            return ReglasDeCuenta.elIdEsValido(id) ?
+              gestionCuentaDA.eliminarCuenta(id) :
+              Task.FromResult(false);
+        }
+
+        public Task<List<Cuenta>> obtenerCuentas()
+        {
+            return gestionCuentaDA.obtenerCuentas();
+        }
+
+        public Task<Cuenta?> validarCuenta(string correoElectronico, string contrasena)
+        {
+            if (!ReglasDeCuenta.elCorreoEsValido(correoElectronico) || string.IsNullOrEmpty(contrasena))
+            {
+                return Task.FromResult<Cuenta?>(null);
+            }
+            return gestionCuentaDA.validarCuenta(correoElectronico, contrasena);
+        }
     }
-  }
 }

@@ -9,7 +9,7 @@ namespace BancaEnLinea.BC.ReglasDeNegocio
     public static bool laCuentaEsValida(Cuenta cuenta)
     {
       return cuenta != null &&
-        laCedulaEsValida(cuenta.Cedula) &&
+        elTelefonoEsValido(cuenta.Telefono) &&
         !string.IsNullOrEmpty(cuenta.Nombre) &&
         !string.IsNullOrEmpty(cuenta.PrimerApellido) &&
         !string.IsNullOrEmpty(cuenta.SegundoApellido) &&
@@ -21,11 +21,10 @@ namespace BancaEnLinea.BC.ReglasDeNegocio
     {
       return id > 0;
     }
-    public static bool laCedulaEsValida(int cedula)
+    public static bool elTelefonoEsValido(long cedula)
     {
-        string cedulaStr = cedula.ToString();
-        return cedulaStr.Length >= 10 &&
-        cedulaStr.Length <= 12 &&
+        string telefonoStr = cedula.ToString();
+        return telefonoStr.Length == 8 &&
         cedula > 0;
     }
     public static bool elCorreoEsValido(string correo)
