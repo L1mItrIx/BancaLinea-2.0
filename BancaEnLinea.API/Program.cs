@@ -11,12 +11,12 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAllOrigins",
-        policy =>
+     policy =>
         {
-            policy.AllowAnyOrigin()
-                  .AllowAnyMethod()
-                  .AllowAnyHeader();
-        });
+  policy.AllowAnyOrigin()
+  .AllowAnyMethod()
+     .AllowAnyHeader();
+   });
 });
 
 // Configurar DbContext
@@ -38,6 +38,22 @@ builder.Services.AddTransient<IGestionBeneficiarioDA, GestionBeneficiarioDA>();
 // Registrar servicios de Transferencia
 builder.Services.AddTransient<IGestionTransferenciaBW, GestionTransferenciaBW>();
 builder.Services.AddTransient<IGestionTransferenciaDA, GestionTransferenciaDA>();
+
+// Registrar servicios de Servicio
+builder.Services.AddTransient<IGestionServicioBW, GestionServicioBW>();
+builder.Services.AddTransient<IGestionServicioDA, GestionServicioDA>();
+
+// Registrar servicios de ContratoServicio
+builder.Services.AddTransient<IGestionContratoServicioBW, GestionContratoServicioBW>();
+builder.Services.AddTransient<IGestionContratoServicioDA, GestionContratoServicioDA>();
+
+// Registrar servicios de PagoServicio
+builder.Services.AddTransient<IGestionPagoServicioBW, GestionPagoServicioBW>();
+builder.Services.AddTransient<IGestionPagoServicioDA, GestionPagoServicioDA>();
+
+// Registrar servicios de Accion
+builder.Services.AddTransient<IGestionAccionBW, GestionAccionBW>();
+builder.Services.AddTransient<IGestionAccionDA, GestionAccionDA>();
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();

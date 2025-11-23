@@ -1,4 +1,5 @@
 using BancaEnLinea.BC.Modelos;
+using BancaEnLinea.BC.Enums;
 using BancaEnLinea.BW.Interfaces.BW;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity.Data;
@@ -74,10 +75,40 @@ namespace BancaEnLinea.API.Controllers
         {
             try
             {
+                Console.WriteLine($"?? Intento de login: {loginRequest.Correo}");
+
                 var cuentaUsuario = await gestionCuentaBW.validarCuenta(loginRequest.Correo, loginRequest.Contrasena);
 
                 if (cuentaUsuario != null)
                 {
+                    // Determinar el nombre del rol y la ruta de redirección
+                    string rolNombre;
+                    string rutaRedireccion;
+
+                    switch (cuentaUsuario.Rol)
+                    {
+                        case RolCuenta.Administrador:
+                            rolNombre = "Administrador";
+                            rutaRedireccion = "/admin/dashboard";
+                            Console.WriteLine($"? Login exitoso - Administrador: {cuentaUsuario.Nombre}");
+                            break;
+                        case RolCuenta.Gestor:
+                            rolNombre = "Gestor";
+                            rutaRedireccion = "/gestor/dashboard";
+                            Console.WriteLine($"? Login exitoso - Gestor: {cuentaUsuario.Nombre}");
+                            break;
+                        case RolCuenta.Cliente:
+                            rolNombre = "Cliente";
+                            rutaRedireccion = "/cliente/dashboard";
+                            Console.WriteLine($"? Login exitoso - Cliente: {cuentaUsuario.Nombre}");
+                            break;
+                        default:
+                            rolNombre = "Desconocido";
+                            rutaRedireccion = "/";
+                            Console.WriteLine($"?? Login con rol desconocido: {cuentaUsuario.Rol}");
+                            break;
+                    }
+
                     return Ok(new
                     {
                         success = true,
@@ -90,11 +121,15 @@ namespace BancaEnLinea.API.Controllers
                             primerApellido = cuentaUsuario.PrimerApellido,
                             segundoApellido = cuentaUsuario.SegundoApellido,
                             correo = cuentaUsuario.Correo,
-                            rol = cuentaUsuario.Rol
+                            rol = cuentaUsuario.Rol,
+                            rolNombre = rolNombre,
+                            nombreCompleto = $"{cuentaUsuario.Nombre} {cuentaUsuario.PrimerApellido} {cuentaUsuario.SegundoApellido}",
+                            rutaRedireccion = rutaRedireccion
                         }
                     });
                 }
 
+                Console.WriteLine($"? Login fallido para: {loginRequest.Correo}");
                 return Unauthorized(new
                 {
                     success = false,
@@ -103,6 +138,7 @@ namespace BancaEnLinea.API.Controllers
             }
             catch (Exception excepcion)
             {
+                Console.WriteLine($"?? ERROR en login: {excepcion.Message}");
                 return StatusCode(500, new
                 {
                     success = false,
@@ -110,5 +146,106 @@ namespace BancaEnLinea.API.Controllers
                 });
             }
         }
+    /// <summary>
+    /// Obtiene SOLO las cuentas de clientes (Rol = Cliente).
+    /// Los gestores usan este endpoint para no ver otros gestores o administradores.
+    /// </summary>
+    [HttpGet("ObtenerCuentasClientes")]
+    public async Task<ActionResult> ObtenerCuentasClientes()
+    {
+      try
+      {
+        Console.WriteLine("?? Obteniendo cuentas de clientes...");
+
+        var todasLasCuentas = await gestionCuentaBW.obtenerCuentas();
+
+        // Filtrar SOLO clientes (Rol = 2)
+        var soloClientes = todasLasCuentas
+          .Where(cuenta => cuenta.Rol == RolCuenta.Cliente)
+          .Select(cuenta => new
+          {
+            id = cuenta.Id,
+            telefono = cuenta.Telefono,
+            nombre = cuenta.Nombre,
+            primerApellido = cuenta.PrimerApellido,
+            segundoApellido = cuenta.SegundoApellido,
+            correo = cuenta.Correo,
+            rol = cuenta.Rol,
+            nombreCompleto = $"{cuenta.Nombre} {cuenta.PrimerApellido} {cuenta.SegundoApellido}"
+          })
+          .ToList();
+
+        Console.WriteLine($"? Se encontraron {soloClientes.Count} clientes");
+
+        return Ok(new
+        {
+          success = true,
+          data = soloClientes,
+          total = soloClientes.Count
+        });
+      }
+      catch (Exception ex)
+      {
+        Console.WriteLine($"? ERROR: {ex.Message}");
+        return StatusCode(500, new
+        {
+          success = false,
+          message = $"Error interno en el servidor: {ex.Message}"
+        });
+      }
     }
+
+    /// <summary>
+    /// Obtiene información básica de una cuenta cliente por su ID.
+    /// Valida que sea un cliente antes de devolver la información.
+    /// </summary>
+    [HttpGet("ObtenerCuentaCliente/{id}")]
+    public async Task<ActionResult> ObtenerCuentaCliente(int id)
+    {
+      try
+      {
+        Console.WriteLine($"?? Buscando cliente con ID: {id}");
+
+        var todasLasCuentas = await gestionCuentaBW.obtenerCuentas();
+        var cliente = todasLasCuentas.FirstOrDefault(c => c.Id == id && c.Rol == RolCuenta.Cliente);
+
+        if (cliente == null)
+        {
+          Console.WriteLine($"? No se encontró cliente con ID: {id}");
+          return NotFound(new
+          {
+            success = false,
+            message = "Cliente no encontrado o no es un cliente válido"
+          });
+        }
+
+        Console.WriteLine($"? Cliente encontrado: {cliente.Nombre} {cliente.PrimerApellido}");
+
+        return Ok(new
+        {
+          success = true,
+          data = new
+          {
+            id = cliente.Id,
+            telefono = cliente.Telefono,
+            nombre = cliente.Nombre,
+            primerApellido = cliente.PrimerApellido,
+            segundoApellido = cliente.SegundoApellido,
+            correo = cliente.Correo,
+            rol = cliente.Rol,
+            nombreCompleto = $"{cliente.Nombre} {cliente.PrimerApellido} {cliente.SegundoApellido}"
+          }
+        });
+      }
+      catch (Exception ex)
+      {
+        Console.WriteLine($"? ERROR: {ex.Message}");
+        return StatusCode(500, new
+        {
+          success = false,
+          message = $"Error interno en el servidor: {ex.Message}"
+        });
+      }
+    }
+  }
 }

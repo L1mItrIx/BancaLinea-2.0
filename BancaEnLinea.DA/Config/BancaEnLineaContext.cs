@@ -12,6 +12,10 @@ namespace BancaEnLinea.DA.Config
     public DbSet<CuentaBancariaDA> CuentaBancaria { get; set; }
     public DbSet<BeneficiarioDA> Beneficiario { get; set; }
     public DbSet<TransferenciaDA> Transferencia { get; set; }
+    public DbSet<ServicioDA> Servicio { get; set; }
+    public DbSet<ContratoServicioDA> ContratoServicio { get; set; }
+    public DbSet<PagoServicioDA> PagoServicio { get; set; }
+    public DbSet<AccionDA> Accion { get; set; }  // ?? Nueva tabla
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -43,6 +47,28 @@ namespace BancaEnLinea.DA.Config
             modelBuilder.Entity<TransferenciaDA>()
       .HasIndex(t => t.IdempotencyKey)
          .IsUnique();
+
+      modelBuilder.Entity<ContratoServicioDA>()
+    .HasOne(cs => cs.Servicio)
+   .WithMany()
+        .HasForeignKey(cs => cs.IdServicio)
+  .OnDelete(DeleteBehavior.Restrict);
+
+      modelBuilder.Entity<ContratoServicioDA>()
+   .HasIndex(cs => cs.NumeroContrato)
+ .IsUnique();
+
+modelBuilder.Entity<PagoServicioDA>()
+        .HasOne(ps => ps.ContratoServicio)
+   .WithMany()
+.HasForeignKey(ps => ps.IdContratoServicio)
+ .OnDelete(DeleteBehavior.Restrict);
+
+     modelBuilder.Entity<PagoServicioDA>()
+        .HasOne(ps => ps.CuentaBancariaOrigen)
+.WithMany()
+   .HasForeignKey(ps => ps.IdCuentaBancariaOrigen)
+  .OnDelete(DeleteBehavior.Restrict);
     }
 
   }

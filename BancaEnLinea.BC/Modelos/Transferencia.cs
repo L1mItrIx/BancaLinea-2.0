@@ -17,7 +17,6 @@ namespace BancaEnLinea.BC.Modelos
         public DateTime FechaEjecucion { get; set; }
         public EstadoTra Estado { get; set; }
         public string? Descripcion { get; set; }
-        public int? IdAprobador { get; set; }
         
         // Propiedades de navegación
         public CuentaBancaria? CuentaBancariaOrigen { get; set; }

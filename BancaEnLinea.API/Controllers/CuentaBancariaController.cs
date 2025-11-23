@@ -1,4 +1,5 @@
 ﻿using BancaEnLinea.BC.Modelos;
+using BancaEnLinea.BC.Enums;
 using BancaEnLinea.BW.Interfaces.BW;
 using Microsoft.AspNetCore.Mvc;
 
@@ -32,13 +33,34 @@ namespace BancaEnLinea.API.Controllers
             }
         }
 
-        [HttpGet("ObtenerTodasLasCuentasBancarias")]
-        public async Task<ActionResult> ObtenerTodasLasCuentasBancarias()
+        [HttpGet("ObtenerCuentasBancarias/{idCuenta}")]
+        public async Task<ActionResult> ObtenerCuentasBancarias(int idCuenta)
         {
             try
             {
-                var resultado = await gestionCuentaBancariaBW.obtenerTodasLasCuentasBancarias();
-                return Ok(resultado);
+                var cuentas = await gestionCuentaBancariaBW.obtenerCuentasBancarias(idCuenta);
+
+                // Agregar información de tipo en texto y nombre del dueño
+                var cuentasConInfo = cuentas.Select(c => new
+                {
+                    id = c.Id,
+                    numeroTarjeta = c.NumeroTarjeta,
+                    tipo = c.Tipo,
+                    tipoTexto = ObtenerTipoTexto(c.Tipo),
+                    moneda = c.Moneda,
+                    monedaTexto = c.Moneda == Moneda.CRC ? "CRC" : "USD",
+                    simboloMoneda = c.Moneda == Moneda.CRC ? "₡" : "$",
+                    saldo = c.Saldo,
+                    estado = c.Estado,
+                    estadoTexto = ObtenerEstadoTexto(c.Estado),
+                    idCuenta = c.IdCuenta,
+                    // Información del dueño
+                    nombreDueno = c.Cuenta != null
+                        ? $"{c.Cuenta.Nombre} {c.Cuenta.PrimerApellido} {c.Cuenta.SegundoApellido}"
+                        : null
+                }).ToList();
+
+                return Ok(cuentasConInfo);
             }
             catch (Exception ex)
             {
@@ -46,16 +68,34 @@ namespace BancaEnLinea.API.Controllers
             }
         }
 
-        [HttpGet("ObtenerCuentaBancaria/{id}")]
-        public async Task<ActionResult> ObtenerCuentaBancariaPorId(int id)
+        [HttpGet("ObtenerTodasLasCuentasBancarias")]
+        public async Task<ActionResult> ObtenerTodasLasCuentasBancarias()
         {
             try
             {
-                var resultado = await gestionCuentaBancariaBW.obtenerCuentaBancariaPorId(id);
-                if (resultado == null)
-                    return NotFound(new { message = "Cuenta bancaria no encontrada" });
+                var cuentas = await gestionCuentaBancariaBW.obtenerTodasLasCuentasBancarias();
 
-                return Ok(resultado);
+                // Agregar información de tipo en texto y nombre del dueño
+                var cuentasConInfo = cuentas.Select(c => new
+                {
+                    id = c.Id,
+                    numeroTarjeta = c.NumeroTarjeta,
+                    tipo = c.Tipo,
+                    tipoTexto = ObtenerTipoTexto(c.Tipo),
+                    moneda = c.Moneda,
+                    monedaTexto = c.Moneda == Moneda.CRC ? "CRC" : "USD",
+                    simboloMoneda = c.Moneda == Moneda.CRC ? "₡" : "$",
+                    saldo = c.Saldo,
+                    estado = c.Estado,
+                    estadoTexto = ObtenerEstadoTexto(c.Estado),
+                    idCuenta = c.IdCuenta,
+                    // Información del dueño
+                    nombreDueno = c.Cuenta != null
+                        ? $"{c.Cuenta.Nombre} {c.Cuenta.PrimerApellido} {c.Cuenta.SegundoApellido}"
+                        : null
+                }).ToList();
+
+                return Ok(cuentasConInfo);
             }
             catch (Exception ex)
             {
@@ -95,6 +135,29 @@ namespace BancaEnLinea.API.Controllers
             {
                 return StatusCode(500, $"Error interno en el servidor: {ex.Message}");
             }
+        }
+
+        private string ObtenerTipoTexto(TipoCuenta tipo)
+        {
+            return tipo switch
+            {
+                TipoCuenta.Ahorros => "Ahorros",
+                TipoCuenta.Corriente => "Corriente",
+                TipoCuenta.Inversion => "Inversión",
+                TipoCuenta.PlazoFijo => "Plazo Fijo",
+                _ => "Desconocido"
+            };
+        }
+
+        private string ObtenerEstadoTexto(EstadoCB estado)
+        {
+            return estado switch
+            {
+                EstadoCB.Activa => "Activa",
+                EstadoCB.Bloqueada => "Bloqueada",
+                EstadoCB.Cerrada => "Cerrada",
+                _ => "Desconocido"
+            };
         }
     }
 }

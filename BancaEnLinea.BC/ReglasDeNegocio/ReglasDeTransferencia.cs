@@ -176,5 +176,40 @@ public static bool elClienteEstaActivo(Cuenta cuenta)
         {
       return id > 0;
         }
+
+   /// <summary>
+  /// Valida que la transferencia tenga la misma moneda o pueda convertirse
+/// </summary>
+        public static bool lasMonedasonCompatibles(Moneda monedaOrigen, Moneda monedaDestino)
+        {
+   // Todas las combinaciones de monedas son compatibles (se puede hacer conversión)
+            return Enum.IsDefined(typeof(Moneda), monedaOrigen) && 
+          Enum.IsDefined(typeof(Moneda), monedaDestino);
+        }
+
+        /// <summary>
+        /// Calcula el monto total a debitar en moneda origen (monto + comisión)
+        /// Si hay conversión de moneda, el monto ya viene convertido
+        /// </summary>
+  public static long calcularMontoTotalConConversion(long montoEnMonedaOrigen, Moneda monedaOrigen)
+    {
+          // La comisión siempre es en la moneda de la cuenta origen
+            // Convertir comisión si es necesario
+  long comision = monedaOrigen == Moneda.CRC ? COMISION_FIJA : 
+           ReglasDeConversionMoneda.convertirMoneda(COMISION_FIJA, Moneda.CRC, Moneda.USD);
+            
+      return montoEnMonedaOrigen + comision;
+        }
+
+        /// <summary>
+        /// Calcula el monto a transferir al destino considerando conversión de moneda
+        /// </summary>
+   public static long calcularMontoDestino(long montoOriginal, Moneda monedaOrigen, Moneda monedaDestino)
+        {
+            if (!ReglasDeConversionMoneda.requiereConversion(monedaOrigen, monedaDestino))
+        return montoOriginal;
+
+       return ReglasDeConversionMoneda.convertirMoneda(montoOriginal, monedaOrigen, monedaDestino);
+      }
     }
 }

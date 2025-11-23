@@ -12,7 +12,7 @@ namespace BancaEnLinea.DA.Entidades
         public int IdBeneficiario { get; set; }
 
         [Required]
-  [ForeignKey("Cuenta")]
+        [ForeignKey("Cuenta")]
         public int IdCuenta { get; set; }
 
         [Required]
@@ -21,7 +21,7 @@ namespace BancaEnLinea.DA.Entidades
 
         [Required]
         [MaxLength(100)]
-     public string Banco { get; set; }
+        public string Banco { get; set; }
 
         [Required]
         public Moneda Moneda { get; set; }
@@ -30,10 +30,13 @@ namespace BancaEnLinea.DA.Entidades
         public long NumeroCuentaDestino { get; set; }
 
         [Required]
-    [MaxLength(50)]
+        [MaxLength(50)]
         public string Pais { get; set; }
 
+        [Required]
+        public EstadoP Estado { get; set; }
+
         // Navegación hacia Cuenta (Cliente)
-  public virtual CuentaDA Cuenta { get; set; }
- }
+        public virtual CuentaDA Cuenta { get; set; }
+    }
 }

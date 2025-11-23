@@ -12,5 +12,7 @@ namespace BancaEnLinea.BW.Interfaces.DA
         Task<List<Transferencia>> obtenerTransferenciasDelDia(int idCuentaBancaria);
         Task<bool> actualizarEstado(int referencia, int estado, int? idAprobador = null, string? descripcion = null);
         Task<bool> actualizarSaldo(int referencia, long saldoPosterior);
+        Task<List<Transferencia>> obtenerTransferenciasPorCliente(int idCliente);
+        Task<List<TransferenciaRecibida>> obtenerTransferenciasRecibidas(int idCliente);
     }
 }

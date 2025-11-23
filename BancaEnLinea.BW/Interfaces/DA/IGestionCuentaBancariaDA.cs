@@ -10,5 +10,6 @@ namespace BancaEnLinea.BW.Interfaces.DA
         Task<bool> actualizarCuentaBancaria(CuentaBancaria cuentaBancaria, int id);
         Task<bool> eliminarCuentaBancaria(int id);
         Task<CuentaBancaria?> obtenerCuentaBancariaPorId(int id);
+        Task<CuentaBancaria?> obtenerCuentaBancariaPorNumeroTarjeta(long numeroTarjeta);
     }
 }

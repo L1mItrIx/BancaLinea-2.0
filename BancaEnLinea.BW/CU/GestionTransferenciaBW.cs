@@ -6,7 +6,7 @@ using BancaEnLinea.BW.Interfaces.DA;
 
 namespace BancaEnLinea.BW.CU
 {
-  public class GestionTransferenciaBW : IGestionTransferenciaBW
+ public class GestionTransferenciaBW : IGestionTransferenciaBW
     {
  private readonly IGestionTransferenciaDA gestionTransferenciaDA;
         private readonly IGestionCuentaBancariaDA gestionCuentaBancariaDA;
@@ -22,81 +22,108 @@ namespace BancaEnLinea.BW.CU
    this.gestionCuentaDA = gestionCuentaDA;
       }
 
-        public async Task<(bool exito, string mensaje, int? referencia)> registrarTransferencia(Transferencia transferencia)
-  {
-    // 1. Validar datos básicos
-      if (!ReglasDeTransferencia.laTransferenciaEsValida(transferencia))
-     return (false, "Datos de transferencia inválidos", null);
-
-    // 2. Validar fecha de ejecución (no más de 90 días)
-  if (!ReglasDeTransferencia.laFechaEjecucionEsValida(transferencia.FechaEjecucion))
-     return (false, $"La fecha de ejecución no puede superar {ReglasDeTransferencia.DIAS_MAXIMOS_PROGRAMACION} días", null);
-
-      // 3. Obtener y validar cuenta bancaria origen
-     var cuentaBancariaOrigen = await gestionCuentaBancariaDA.obtenerCuentaBancariaPorId(transferencia.IdCuentaBancariaOrigen);
-    if (cuentaBancariaOrigen == null)
-       return (false, "Cuenta bancaria de origen no encontrada", null);
-
-  // 4. Validar que la cuenta bancaria esté activa
-if (!ReglasDeTransferencia.laCuentaBancariaEstaActiva(cuentaBancariaOrigen))
-    return (false, "La cuenta bancaria de origen no está activa", null);
-
-// 5. Obtener y validar cuenta del cliente
- var cliente = await gestionCuentaDA.obtenerCuentaPorId(cuentaBancariaOrigen.IdCuenta);
-     if (!ReglasDeTransferencia.elClienteEstaActivo(cliente))
-  return (false, "El cliente no está activo o no tiene permisos", null);
-
- // 6. Calcular montos
-     transferencia.Comision = ReglasDeTransferencia.COMISION_FIJA;
-  transferencia.MontoTotal = ReglasDeTransferencia.calcularMontoTotal(transferencia.Monto);
-
- // 7. Validar saldo suficiente
-if (!ReglasDeTransferencia.elSaldoEsSuficiente(cuentaBancariaOrigen.Saldo, transferencia.MontoTotal))
-   return (false, "Saldo insuficiente para realizar la transferencia", null);
-
-       // 8. Validar límite diario
-      var transferenciasDelDia = await gestionTransferenciaDA.obtenerTransferenciasDelDia(transferencia.IdCuentaBancariaOrigen);
-if (!ReglasDeTransferencia.noSuperaLimiteDiario(transferenciasDelDia, transferencia.MontoTotal))
-   return (false, "Se ha excedido el límite diario de transferencias", null);
-
- // 9. Calcular saldos
-         transferencia.SaldoAnterior = cuentaBancariaOrigen.Saldo;
-   transferencia.SaldoPosterior = ReglasDeTransferencia.calcularSaldoPosterior(cuentaBancariaOrigen.Saldo, transferencia.MontoTotal);
-
-   // 10. Establecer fechas
-     transferencia.FechaCreacion = DateTime.Now;
-
-      // 11. Determinar estado inicial
-    transferencia.Estado = ReglasDeTransferencia.determinarEstadoInicial(transferencia.Monto, transferencia.FechaEjecucion);
-
- // 12. Registrar la transferencia
-      int referencia = await gestionTransferenciaDA.registrarTransferencia(transferencia);
- if (referencia <= 0)
-     return (false, "Error al registrar la transferencia", null);
-
-    // 13. Si no requiere aprobación y es para hoy, ejecutar inmediatamente
-       if (transferencia.Estado == EstadoTra.Pendiente && 
-!ReglasDeTransferencia.requiereAprobacion(transferencia.Monto) && 
-    transferencia.FechaEjecucion.Date == DateTime.Now.Date)
+        public async Task<(bool exito, string mensaje, int? referencia)> registrarTransferencia(TransferenciaRequest request)
+        {
+   // Construir objeto Transferencia completo desde el request
+            var transferencia = new Transferencia
    {
- var resultadoEjecucion = await ejecutarTransferencia(referencia);
-if (!resultadoEjecucion.exito)
-        return (false, resultadoEjecucion.mensaje, referencia);
-     }
-
-            // 14. Retornar mensaje según el estado
-  string mensaje = transferencia.Estado switch
-  {
- EstadoTra.Pendiente => $"Transferencia pendiente de aprobación (supera ?{ReglasDeTransferencia.UMBRAL_APROBACION:N0})",
-    EstadoTra.Programada => $"Transferencia programada para {transferencia.FechaEjecucion:dd/MM/yyyy}",
-  EstadoTra.Exitosa => "Transferencia realizada exitosamente",
-   _ => "Transferencia registrada"
+   // Generar IdempotencyKey automáticamente
+       IdempotencyKey = Guid.NewGuid().ToString(),
+  IdCuentaBancariaOrigen = request.IdCuentaBancariaOrigen,
+       NumeroCuentaDestino = request.NumeroCuentaDestino,
+  Monto = request.Monto,
+  // Si FechaEjecucion es null o pasado, se ejecuta HOY
+   FechaEjecucion = request.FechaEjecucion.HasValue && request.FechaEjecucion.Value.Date > DateTime.Now.Date
+     ? request.FechaEjecucion.Value.Date
+      : DateTime.Now.Date,
+       Descripcion = request.Descripcion
  };
 
-  return (true, mensaje, referencia);
-}
+ // 1. Validar datos básicos
+        if (!ReglasDeTransferencia.laTransferenciaEsValida(transferencia))
+  return (false, "Datos de transferencia inválidos", null);
 
- public Task<List<Transferencia>> obtenerTransferenciasPorCuentaBancaria(int idCuentaBancaria)
+ // 2. Validar fecha de ejecución (no más de 90 días)
+     if (!ReglasDeTransferencia.laFechaEjecucionEsValida(transferencia.FechaEjecucion))
+     return (false, $"La fecha de ejecución no puede superar {ReglasDeTransferencia.DIAS_MAXIMOS_PROGRAMACION} días", null);
+
+    // 3. Obtener y validar cuenta bancaria origen
+ var cuentaBancariaOrigen = await gestionCuentaBancariaDA.obtenerCuentaBancariaPorId(transferencia.IdCuentaBancariaOrigen);
+  if (cuentaBancariaOrigen == null)
+ return (false, "Cuenta bancaria de origen no encontrada", null);
+
+ // 4. Validar que la cuenta bancaria esté activa
+       if (!ReglasDeTransferencia.laCuentaBancariaEstaActiva(cuentaBancariaOrigen))
+    return (false, "La cuenta bancaria de origen no está activa", null);
+
+ // 5. Obtener y validar cuenta del cliente
+      var cliente = await gestionCuentaDA.obtenerCuentaPorId(cuentaBancariaOrigen.IdCuenta);
+       if (!ReglasDeTransferencia.elClienteEstaActivo(cliente))
+  return (false, "El cliente no está activo o no tiene permisos", null);
+
+    // 6. Obtener cuenta destino para verificar moneda (si existe en el sistema)
+      var cuentaBancariaDestino = await gestionCuentaBancariaDA.obtenerCuentaBancariaPorNumeroTarjeta(transferencia.NumeroCuentaDestino);
+         Moneda monedaDestino = cuentaBancariaDestino?.Moneda ?? cuentaBancariaOrigen.Moneda; // Si no existe, asumimos misma moneda
+            
+// 7. Validar compatibilidad de monedas
+            if (!ReglasDeTransferencia.lasMonedasonCompatibles(cuentaBancariaOrigen.Moneda, monedaDestino))
+    return (false, "Monedas incompatibles para la transferencia", null);
+
+// 8. Calcular montos automáticamente con conversión de moneda
+       // La comisión se calcula en la moneda de origen
+    transferencia.Comision = cuentaBancariaOrigen.Moneda == Moneda.CRC ? 
+      ReglasDeTransferencia.COMISION_FIJA : 
+       ReglasDeConversionMoneda.convertirMoneda(ReglasDeTransferencia.COMISION_FIJA, Moneda.CRC, Moneda.USD);
+            
+            transferencia.MontoTotal = transferencia.Monto + transferencia.Comision;
+
+            // 9. Validar saldo suficiente
+ if (!ReglasDeTransferencia.elSaldoEsSuficiente(cuentaBancariaOrigen.Saldo, transferencia.MontoTotal))
+  return (false, "Saldo insuficiente para realizar la transferencia", null);
+
+    // 10. Validar límite diario (convertido a moneda de origen si es necesario)
+   var transferenciasDelDia = await gestionTransferenciaDA.obtenerTransferenciasDelDia(transferencia.IdCuentaBancariaOrigen);
+            if (!ReglasDeTransferencia.noSuperaLimiteDiario(transferenciasDelDia, transferencia.MontoTotal))
+       return (false, "Se ha excedido el límite diario de transferencias", null);
+
+            // 11. Calcular saldos automáticamente
+ transferencia.SaldoAnterior = cuentaBancariaOrigen.Saldo;
+      transferencia.SaldoPosterior = ReglasDeTransferencia.calcularSaldoPosterior(cuentaBancariaOrigen.Saldo, transferencia.MontoTotal);
+
+ // 12. Establecer fecha de creación automáticamente
+         transferencia.FechaCreacion = DateTime.Now;
+
+    // 13. Determinar estado inicial automáticamente
+ transferencia.Estado = ReglasDeTransferencia.determinarEstadoInicial(transferencia.Monto, transferencia.FechaEjecucion);
+
+   // 14. Registrar la transferencia
+       int referenciaId = await gestionTransferenciaDA.registrarTransferencia(transferencia);
+            if (referenciaId <= 0)
+  return (false, "Error al registrar la transferencia", null);
+
+// 15. Si no requiere aprobación y es para hoy, ejecutar inmediatamente
+if (transferencia.Estado == EstadoTra.Pendiente && 
+      !ReglasDeTransferencia.requiereAprobacion(transferencia.Monto) && 
+    transferencia.FechaEjecucion.Date == DateTime.Now.Date)
+   {
+   var resultadoEjecucion = await ejecutarTransferencia(referenciaId);
+   if (!resultadoEjecucion.exito)
+   return (false, resultadoEjecucion.mensaje, referenciaId);
+   }
+
+   // 16. Retornar mensaje según el estado
+ string mensaje = transferencia.Estado switch
+      {
+     EstadoTra.Pendiente => $"Transferencia pendiente de aprobación (supera ?{ReglasDeTransferencia.UMBRAL_APROBACION:N0})",
+EstadoTra.Programada => $"Transferencia programada para {transferencia.FechaEjecucion:dd/MM/yyyy}",
+       EstadoTra.Exitosa => "Transferencia realizada exitosamente",
+     _ => "Transferencia registrada"
+   };
+
+     return (true, mensaje, referenciaId);
+        }
+
+        public Task<List<Transferencia>> obtenerTransferenciasPorCuentaBancaria(int idCuentaBancaria)
  {
      return gestionTransferenciaDA.obtenerTransferenciasPorCuentaBancaria(idCuentaBancaria);
 }
@@ -114,6 +141,16 @@ if (!resultadoEjecucion.exito)
         public Task<List<Transferencia>> obtenerTransferenciasPendientes()
 {
        return gestionTransferenciaDA.obtenerTransferenciasPendientes();
+   }
+
+        public Task<List<Transferencia>> obtenerTransferenciasPorCliente(int idCliente)
+        {
+   return gestionTransferenciaDA.obtenerTransferenciasPorCliente(idCliente);
+     }
+
+     public Task<List<TransferenciaRecibida>> obtenerTransferenciasRecibidas(int idCliente)
+  {
+        return gestionTransferenciaDA.obtenerTransferenciasRecibidas(idCliente);
    }
 
       public async Task<(bool exito, string mensaje)> cancelarTransferencia(int referencia, int idCliente)
@@ -135,7 +172,7 @@ return (false, $"Solo se pueden cancelar transferencias con al menos {ReglasDeTr
       return resultado ? (true, "Transferencia cancelada exitosamente") : (false, "Error al cancelar la transferencia");
         }
 
-        public async Task<(bool exito, string mensaje)> aprobarTransferencia(int referencia, int idAprobador)
+        public async Task<(bool exito, string mensaje)> aprobarTransferencia(int referencia)
  {
      var transferencia = await gestionTransferenciaDA.obtenerTransferenciaPorReferencia(referencia);
   if (transferencia == null)
@@ -145,22 +182,17 @@ return (false, $"Solo se pueden cancelar transferencias con al menos {ReglasDeTr
 if (transferencia.Estado != EstadoTra.Pendiente)
     return (false, "Solo se pueden aprobar transferencias pendientes");
 
-// Validar que el aprobador sea Admin o Gestor
-        var aprobador = await gestionCuentaDA.obtenerCuentaPorId(idAprobador);
-  if (!ReglasDeTransferencia.elAprobadorEsValido(aprobador))
-            return (false, "No tiene permisos para aprobar transferencias");
-
    // Ejecutar la transferencia
   var resultadoEjecucion = await ejecutarTransferencia(referencia);
       if (!resultadoEjecucion.exito)
      return (false, resultadoEjecucion.mensaje);
 
-            // Registrar aprobación
-      bool resultado = await gestionTransferenciaDA.actualizarEstado(referencia, (int)EstadoTra.Exitosa, idAprobador);
-     return resultado ? (true, "Transferencia aprobada y ejecutada exitosamente") : (false, "Error al aprobar la transferencia");
+            // Actualizar estado a Exitosa
+      await gestionTransferenciaDA.actualizarEstado(referencia, (int)EstadoTra.Exitosa);
+     return (true, "Transferencia aprobada y ejecutada exitosamente");
  }
 
-     public async Task<(bool exito, string mensaje)> rechazarTransferencia(int referencia, int idAprobador, string motivo)
+     public async Task<(bool exito, string mensaje)> rechazarTransferencia(int referencia, string motivo)
    {
  var transferencia = await gestionTransferenciaDA.obtenerTransferenciaPorReferencia(referencia);
       if (transferencia == null)
@@ -170,40 +202,71 @@ if (transferencia.Estado != EstadoTra.Pendiente)
    if (transferencia.Estado != EstadoTra.Pendiente)
    return (false, "Solo se pueden rechazar transferencias pendientes");
 
-            // Validar que el aprobador sea Admin o Gestor
- var aprobador = await gestionCuentaDA.obtenerCuentaPorId(idAprobador);
-            if (!ReglasDeTransferencia.elAprobadorEsValido(aprobador))
-     return (false, "No tiene permisos para rechazar transferencias");
-
-     bool resultado = await gestionTransferenciaDA.actualizarEstado(referencia, (int)EstadoTra.Rechazada, idAprobador, motivo);
- return resultado ? (true, "Transferencia rechazada") : (false, "Error al rechazar la transferencia");
+     // Actualizar estado a Rechazada
+   await gestionTransferenciaDA.actualizarEstado(referencia, (int)EstadoTra.Rechazada, null, motivo);
+ return (true, "Transferencia rechazada");
         }
 
-    // Método privado para ejecutar una transferencia
+ // Método privado para ejecutar una transferencia
      private async Task<(bool exito, string mensaje)> ejecutarTransferencia(int referencia)
- {
-   var transferencia = await gestionTransferenciaDA.obtenerTransferenciaPorReferencia(referencia);
-     if (transferencia == null)
+        {
+            var transferencia = await gestionTransferenciaDA.obtenerTransferenciaPorReferencia(referencia);
+ if (transferencia == null)
        return (false, "Transferencia no encontrada");
 
-  var cuentaBancariaOrigen = await gestionCuentaBancariaDA.obtenerCuentaBancariaPorId(transferencia.IdCuentaBancariaOrigen);
-  if (cuentaBancariaOrigen == null)
-return (false, "Cuenta bancaria no encontrada");
+     var cuentaBancariaOrigen = await gestionCuentaBancariaDA.obtenerCuentaBancariaPorId(transferencia.IdCuentaBancariaOrigen);
+ if (cuentaBancariaOrigen == null)
+                return (false, "Cuenta bancaria de origen no encontrada");
 
-       // Actualizar saldo de la cuenta origen (debitar)
- cuentaBancariaOrigen.Saldo = transferencia.SaldoPosterior;
+    Console.WriteLine($"?? Ejecutando transferencia #{referencia}");
+    Console.WriteLine($"   Cuenta Origen: {cuentaBancariaOrigen.NumeroTarjeta} ({cuentaBancariaOrigen.Moneda})");
+ Console.WriteLine($"   Monto a transferir: {transferencia.Monto}");
 
-// Actualizar estado según saldo
-cuentaBancariaOrigen.Estado = ReglasDeCuentaBancaria.determinarEstadoPorSaldo(cuentaBancariaOrigen.Saldo, cuentaBancariaOrigen.Estado);
+    // 1. DEBITAR de la cuenta origen
+    cuentaBancariaOrigen.Saldo = transferencia.SaldoPosterior;
+    cuentaBancariaOrigen.Estado = ReglasDeCuentaBancaria.determinarEstadoPorSaldo(cuentaBancariaOrigen.Saldo, cuentaBancariaOrigen.Estado);
 
     bool saldoActualizado = await gestionCuentaBancariaDA.actualizarCuentaBancaria(cuentaBancariaOrigen, cuentaBancariaOrigen.Id);
-  if (!saldoActualizado)
- return (false, "Error al actualizar el saldo");
+    if (!saldoActualizado)
+        return (false, "Error al debitar saldo de cuenta origen");
 
-       // Actualizar estado de la transferencia
+    Console.WriteLine($"   ? Debitado de cuenta origen: {transferencia.MontoTotal} (monto + comisión)");
+
+    // 2. ACREDITAR a la cuenta destino (si existe en el sistema)
+    var cuentaBancariaDestino = await gestionCuentaBancariaDA.obtenerCuentaBancariaPorNumeroTarjeta(transferencia.NumeroCuentaDestino);
+    if (cuentaBancariaDestino != null)
+    {
+   Console.WriteLine($"   Cuenta Destino: {cuentaBancariaDestino.NumeroTarjeta} ({cuentaBancariaDestino.Moneda})");
+        
+        // Calcular monto a acreditar con conversión de moneda si es necesario
+     long montoAcreditar = ReglasDeTransferencia.calcularMontoDestino(
+  transferencia.Monto, 
+            cuentaBancariaOrigen.Moneda, 
+     cuentaBancariaDestino.Moneda);
+
+        Console.WriteLine($"   Moneda Origen: {cuentaBancariaOrigen.Moneda}, Moneda Destino: {cuentaBancariaDestino.Moneda}");
+      Console.WriteLine($"   Monto Original: {transferencia.Monto}");
+        Console.WriteLine($"   Monto a Acreditar (después de conversión): {montoAcreditar}");
+
+   // Sumar el MONTO (con conversión, sin comisión) a la cuenta destino
+        cuentaBancariaDestino.Saldo += montoAcreditar;
+     cuentaBancariaDestino.Estado = ReglasDeCuentaBancaria.determinarEstadoPorSaldo(cuentaBancariaDestino.Saldo, cuentaBancariaDestino.Estado);
+        
+        bool saldoDestinoActualizado = await gestionCuentaBancariaDA.actualizarCuentaBancaria(cuentaBancariaDestino, cuentaBancariaDestino.Id);
+     if (!saldoDestinoActualizado)
+            return (false, "Error al acreditar saldo en cuenta destino");
+
+Console.WriteLine($"   ? Acreditado a cuenta destino: {montoAcreditar}");
+    }
+    else
+    {
+        Console.WriteLine($"   ?? Cuenta destino no existe en el sistema (transferencia externa)");
+    }
+
+    // Actualizar estado de la transferencia
     await gestionTransferenciaDA.actualizarEstado(referencia, (int)EstadoTra.Exitosa);
 
   return (true, "Transferencia ejecutada exitosamente");
-}
+        }
     }
 }

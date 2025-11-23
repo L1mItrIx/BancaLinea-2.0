@@ -1,4 +1,5 @@
 using BancaEnLinea.BC.Modelos;
+using BancaEnLinea.BC.Enums;
 using BancaEnLinea.BW.Interfaces.DA;
 using BancaEnLinea.DA.Config;
 using BancaEnLinea.DA.Entidades;
@@ -26,7 +27,8 @@ namespace BancaEnLinea.DA.Acciones
       Banco = beneficiario.Banco,
        Moneda = beneficiario.Moneda,
        NumeroCuentaDestino = beneficiario.NumeroCuentaDestino,
-        Pais = beneficiario.Pais
+        Pais = beneficiario.Pais,
+Estado = EstadoP.Pendiente  // Siempre inicia como Pendiente
  };
 
        bancaEnLineaContext.Beneficiario.Add(beneficiarioEntidad);
@@ -56,6 +58,7 @@ namespace BancaEnLinea.DA.Acciones
  Moneda = b.Moneda,
    NumeroCuentaDestino = b.NumeroCuentaDestino,
         Pais = b.Pais,
+        Estado = b.Estado,
   Cuenta = b.Cuenta != null ? new Cuenta
    {
           Id = b.Cuenta.Id,
@@ -85,6 +88,7 @@ Correo = b.Cuenta.Correo,
                 Moneda = b.Moneda,
      NumeroCuentaDestino = b.NumeroCuentaDestino,
          Pais = b.Pais,
+         Estado = b.Estado,
                 Cuenta = b.Cuenta != null ? new Cuenta
      {
    Id = b.Cuenta.Id,
@@ -117,6 +121,7 @@ if (beneficiarioEntidad == null)
       Moneda = beneficiarioEntidad.Moneda,
         NumeroCuentaDestino = beneficiarioEntidad.NumeroCuentaDestino,
  Pais = beneficiarioEntidad.Pais,
+        Estado = beneficiarioEntidad.Estado,
        Cuenta = beneficiarioEntidad.Cuenta != null ? new Cuenta
     {
          Id = beneficiarioEntidad.Cuenta.Id,
@@ -149,13 +154,67 @@ if (beneficiarioExistente == null)
 
       public async Task<bool> eliminarBeneficiario(int idBeneficiario)
    {
-            var beneficiario = await bancaEnLineaContext.Beneficiario.FindAsync(idBeneficiario);
-     if (beneficiario == null)
-       return false;
+   var beneficiario = await bancaEnLineaContext.Beneficiario.FindAsync(idBeneficiario);
+if (beneficiario == null)
+     return false;
 
-   bancaEnLineaContext.Beneficiario.Remove(beneficiario);
-   await bancaEnLineaContext.SaveChangesAsync();
-            return true;
-        }
+         bancaEnLineaContext.Beneficiario.Remove(beneficiario);
+      await bancaEnLineaContext.SaveChangesAsync();
+     return true;
     }
+
+        public async Task<List<Beneficiarios>> obtenerBeneficiariosPendientes()
+        {
+     var beneficiariosDeBaseDeDatos = await bancaEnLineaContext.Beneficiario
+     .Where(b => b.Estado == EstadoP.Pendiente)
+      .Include(b => b.Cuenta)
+  .AsNoTracking()
+   .OrderBy(b => b.IdBeneficiario)
+         .ToListAsync();
+
+   return beneficiariosDeBaseDeDatos.Select(b => new Beneficiarios
+       {
+   IdBeneficiario = b.IdBeneficiario,
+IdCuenta = b.IdCuenta,
+   Alias = b.Alias,
+   Banco = b.Banco,
+      Moneda = b.Moneda,
+NumeroCuentaDestino = b.NumeroCuentaDestino,
+   Pais = b.Pais,
+  Estado = b.Estado,
+     Cuenta = b.Cuenta != null ? new Cuenta
+ {
+     Id = b.Cuenta.Id,
+ Nombre = b.Cuenta.Nombre,
+    PrimerApellido = b.Cuenta.PrimerApellido,
+  SegundoApellido = b.Cuenta.SegundoApellido,
+      Correo = b.Cuenta.Correo,
+            Telefono = b.Cuenta.Telefono,
+      Rol = b.Cuenta.Rol
+     } : null
+      }).ToList();
+    }
+
+        public async Task<bool> confirmarBeneficiario(int idBeneficiario)
+        {
+   var beneficiario = await bancaEnLineaContext.Beneficiario.FindAsync(idBeneficiario);
+  if (beneficiario == null || beneficiario.Estado != EstadoP.Pendiente)
+      return false;
+
+     beneficiario.Estado = EstadoP.Activo;
+    await bancaEnLineaContext.SaveChangesAsync();
+     return true;
+      }
+
+     public async Task<bool> rechazarBeneficiario(int idBeneficiario)
+        {
+      var beneficiario = await bancaEnLineaContext.Beneficiario.FindAsync(idBeneficiario);
+ if (beneficiario == null || beneficiario.Estado != EstadoP.Pendiente)
+    return false;
+
+   beneficiario.Estado = EstadoP.Inactivo;
+ await bancaEnLineaContext.SaveChangesAsync();
+        return true;
+  }
+  }
 }

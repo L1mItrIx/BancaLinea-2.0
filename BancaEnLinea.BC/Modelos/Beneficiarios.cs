@@ -11,6 +11,7 @@ namespace BancaEnLinea.BC.Modelos
         public Moneda Moneda { get; set; }
         public long NumeroCuentaDestino { get; set; }
         public string Pais { get; set; }
+        public EstadoP Estado { get; set; }
 
         // Propiedad de navegación opcional para incluir datos del cliente
         public Cuenta? Cuenta { get; set; }

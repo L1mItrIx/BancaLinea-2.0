@@ -33,8 +33,7 @@ SaldoAnterior = transferencia.SaldoAnterior,
     FechaCreacion = transferencia.FechaCreacion,
    FechaEjecucion = transferencia.FechaEjecucion,
         Estado = transferencia.Estado,
-       Descripcion = transferencia.Descripcion,
-    IdAprobador = transferencia.IdAprobador
+       Descripcion = transferencia.Descripcion
  };
 
      bancaEnLineaContext.Transferencia.Add(transferenciaEntidad);
@@ -132,13 +131,38 @@ SaldoAnterior = transferencia.SaldoAnterior,
  if (transferencia == null)
            return false;
 
-            transferencia.SaldoPosterior = saldoPosterior;
+  transferencia.SaldoPosterior = saldoPosterior;
    await bancaEnLineaContext.SaveChangesAsync();
   return true;
    }
 
-  // Métodos privados de mapeo
-   private List<Transferencia> MapearTransferencias(List<TransferenciaDA> transferenciasDA)
+        public async Task<List<Transferencia>> obtenerTransferenciasPorCliente(int idCliente)
+{
+    // Obtener todos los números de cuenta bancaria del cliente
+    var numerosCuentasCliente = await bancaEnLineaContext.CuentaBancaria
+        .Where(cb => cb.IdCuenta == idCliente)
+   .Select(cb => cb.NumeroTarjeta)
+        .ToListAsync();
+
+ // Obtener transferencias donde el cliente es ORIGEN o DESTINO
+    var transferencias = await bancaEnLineaContext.Transferencia
+        .Include(t => t.CuentaBancariaOrigen)
+        .ThenInclude(cb => cb.Cuenta)
+        .Include(t => t.Aprobador)
+        .Where(t => 
+// Transferencias ENVIADAS (cliente es origen)
+         t.CuentaBancariaOrigen.IdCuenta == idCliente ||
+         // Transferencias RECIBIDAS (cliente es destino)
+            numerosCuentasCliente.Contains(t.NumeroCuentaDestino))
+        .AsNoTracking()
+        .OrderByDescending(t => t.FechaCreacion)
+        .ToListAsync();
+
+    return MapearTransferencias(transferencias);
+ }
+
+        // Método privado para mapear con TODA la información necesaria
+ private List<Transferencia> MapearTransferencias(List<TransferenciaDA> transferenciasDA)
  {
      return transferenciasDA.Select(t => MapearTransferencia(t)).ToList();
  }
@@ -152,28 +176,38 @@ SaldoAnterior = transferencia.SaldoAnterior,
    IdCuentaBancariaOrigen = t.IdCuentaBancariaOrigen,
     NumeroCuentaDestino = t.NumeroCuentaDestino,
     Monto = t.Monto,
-     Comision = t.Comision,
-          MontoTotal = t.MontoTotal,
+ Comision = t.Comision,
+     MontoTotal = t.MontoTotal,
    SaldoAnterior = t.SaldoAnterior,
     SaldoPosterior = t.SaldoPosterior,
     FechaCreacion = t.FechaCreacion,
      FechaEjecucion = t.FechaEjecucion,
     Estado = t.Estado,
    Descripcion = t.Descripcion,
-   IdAprobador = t.IdAprobador,
        CuentaBancariaOrigen = t.CuentaBancariaOrigen != null ? new CuentaBancaria
-           {
+   {
   Id = t.CuentaBancariaOrigen.Id,
         NumeroTarjeta = t.CuentaBancariaOrigen.NumeroTarjeta,
-      Tipo = t.CuentaBancariaOrigen.Tipo,
-                Moneda = t.CuentaBancariaOrigen.Moneda,
-        Saldo = t.CuentaBancariaOrigen.Saldo,
-      Estado = t.CuentaBancariaOrigen.Estado,
-    IdCuenta = t.CuentaBancariaOrigen.IdCuenta
+    Tipo = t.CuentaBancariaOrigen.Tipo,
+     Moneda = t.CuentaBancariaOrigen.Moneda,
+   Saldo = t.CuentaBancariaOrigen.Saldo,
+    Estado = t.CuentaBancariaOrigen.Estado,
+  IdCuenta = t.CuentaBancariaOrigen.IdCuenta,
+   Cuenta = t.CuentaBancariaOrigen.Cuenta != null ? new Cuenta
+     {
+     Id = t.CuentaBancariaOrigen.Cuenta.Id,
+    Telefono = t.CuentaBancariaOrigen.Cuenta.Telefono,
+      Nombre = t.CuentaBancariaOrigen.Cuenta.Nombre,
+ PrimerApellido = t.CuentaBancariaOrigen.Cuenta.PrimerApellido,
+          SegundoApellido = t.CuentaBancariaOrigen.Cuenta.SegundoApellido,
+     Correo = t.CuentaBancariaOrigen.Cuenta.Correo,
+     Rol = t.CuentaBancariaOrigen.Cuenta.Rol
+   } : null
    } : null,
-            Aprobador = t.Aprobador != null ? new Cuenta
-    {
-           Id = t.Aprobador.Id,
+Aprobador = t.Aprobador != null ? new Cuenta
+{
+     Id = t.Aprobador.Id,
+    Telefono = t.Aprobador.Telefono,
      Nombre = t.Aprobador.Nombre,
   PrimerApellido = t.Aprobador.PrimerApellido,
      SegundoApellido = t.Aprobador.SegundoApellido,
@@ -182,5 +216,36 @@ SaldoAnterior = transferencia.SaldoAnterior,
      } : null
       };
    }
+
+        public async Task<List<TransferenciaRecibida>> obtenerTransferenciasRecibidas(int idCliente)
+        {
+ // Obtener números de cuenta del cliente
+       var numerosCuentasCliente = await bancaEnLineaContext.CuentaBancaria
+  .Where(cb => cb.IdCuenta == idCliente)
+      .Select(cb => cb.NumeroTarjeta)
+    .ToListAsync();
+
+// Obtener solo transferencias donde el cliente es DESTINO
+  var transferencias = await bancaEnLineaContext.Transferencia
+   .Include(t => t.CuentaBancariaOrigen)
+   .ThenInclude(cb => cb.Cuenta)
+      .Where(t => numerosCuentasCliente.Contains(t.NumeroCuentaDestino) && t.Estado == EstadoTra.Exitosa)
+        .AsNoTracking()
+  .OrderByDescending(t => t.FechaCreacion)
+   .ToListAsync();
+
+// Mapear a DTO simplificado
+   return transferencias.Select(t => new TransferenciaRecibida
+        {
+       Referencia = t.Referencia,
+  Monto = t.Monto,
+      FechaRecepcion = t.FechaEjecucion,
+Remitente = t.CuentaBancariaOrigen?.Cuenta != null 
+  ? $"{t.CuentaBancariaOrigen.Cuenta.Nombre} {t.CuentaBancariaOrigen.Cuenta.PrimerApellido}"
+: "Desconocido",
+    CuentaOrigen = t.CuentaBancariaOrigen?.NumeroTarjeta ?? 0,
+        Descripcion = t.Descripcion ?? "Sin descripción"
+   }).ToList();
+        }
     }
 }
