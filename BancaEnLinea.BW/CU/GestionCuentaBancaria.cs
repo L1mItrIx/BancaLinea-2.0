@@ -19,32 +19,31 @@ namespace BancaEnLinea.BW.CU
 
         public async Task<bool> registrarCuentaBancaria(CuentaBancaria cuentaBancaria, int idCuenta)
         {
-            // Validar que solo clientes puedan tener cuentas bancarias
             var cuenta = await gestionCuentaDA.obtenerCuentaPorId(idCuenta);
-            if (cuenta == null || !ReglasDeCuentaBancaria.puedeTenerCuentaBancaria(cuenta))
-            {
+            if (!validarCuentaCliente(cuenta))
                 return false;
-            }
 
-            // Generar número de tarjeta único
-            cuentaBancaria.NumeroTarjeta = await GenerarNumeroTarjetaUnico();
-
-            // Determinar el estado basado en el saldo
-            cuentaBancaria.Estado = ReglasDeCuentaBancaria.determinarEstadoPorSaldo(cuentaBancaria.Saldo, cuentaBancaria.Estado);
+            await prepararCuentaBancaria(cuentaBancaria);
 
             if (!ReglasDeCuentaBancaria.laCuentaBancariaEsValida(cuentaBancaria))
-            {
                 return false;
-            }
 
             var cuentasExistentes = await gestionCuentaBancariaDA.obtenerCuentasBancarias(idCuenta);
-
             if (!ReglasDeCuentaBancaria.puedeCrearNuevaCuenta(cuentasExistentes, cuentaBancaria))
-            {
                 return false;
-            }
 
             return await gestionCuentaBancariaDA.registrarCuentaBancaria(cuentaBancaria, idCuenta);
+        }
+
+        private bool validarCuentaCliente(Cuenta cuenta)
+        {
+            return cuenta != null && ReglasDeCuentaBancaria.puedeTenerCuentaBancaria(cuenta);
+        }
+
+        private async Task prepararCuentaBancaria(CuentaBancaria cuentaBancaria)
+        {
+            cuentaBancaria.NumeroTarjeta = await GenerarNumeroTarjetaUnico();
+            cuentaBancaria.Estado = ReglasDeCuentaBancaria.determinarEstadoPorSaldo(cuentaBancaria.Saldo, cuentaBancaria.Estado);
         }
 
         private async Task<long> GenerarNumeroTarjetaUnico()
@@ -88,35 +87,33 @@ namespace BancaEnLinea.BW.CU
         public async Task<bool> actualizarCuentaBancaria(CuentaBancaria cuentaBancaria, int id)
         {
             if (!ReglasDeCuenta.elIdEsValido(id))
-            {
                 return false;
-            }
 
-            // Obtener la cuenta bancaria existente
             var cuentaExistente = await gestionCuentaBancariaDA.obtenerCuentaBancariaPorId(id);
             if (cuentaExistente == null)
-            {
                 return false;
-            }
 
-            // Preservar el número de tarjeta existente (no se puede cambiar)
-            cuentaBancaria.NumeroTarjeta = cuentaExistente.NumeroTarjeta;
-
-            // Si el número de tarjeta no existe o es inválido, generar uno nuevo
-            if (cuentaBancaria.NumeroTarjeta == 0 || cuentaBancaria.NumeroTarjeta.ToString().Length != 12)
-            {
-                cuentaBancaria.NumeroTarjeta = await GenerarNumeroTarjetaUnico();
-            }
-
-            // Determinar el estado basado en el saldo
-            cuentaBancaria.Estado = ReglasDeCuentaBancaria.determinarEstadoPorSaldo(cuentaBancaria.Saldo, cuentaBancaria.Estado);
+            await configurarCuentaBancariaParaActualizacion(cuentaBancaria, cuentaExistente);
 
             if (!ReglasDeCuentaBancaria.laCuentaBancariaEsValida(cuentaBancaria))
-            {
                 return false;
-            }
 
             return await gestionCuentaBancariaDA.actualizarCuentaBancaria(cuentaBancaria, id);
+        }
+
+        private async Task configurarCuentaBancariaParaActualizacion(CuentaBancaria cuentaBancaria, CuentaBancaria cuentaExistente)
+        {
+            cuentaBancaria.NumeroTarjeta = cuentaExistente.NumeroTarjeta;
+
+            if (esNumeroTarjetaInvalido(cuentaBancaria.NumeroTarjeta))
+                cuentaBancaria.NumeroTarjeta = await GenerarNumeroTarjetaUnico();
+
+            cuentaBancaria.Estado = ReglasDeCuentaBancaria.determinarEstadoPorSaldo(cuentaBancaria.Saldo, cuentaBancaria.Estado);
+        }
+
+        private bool esNumeroTarjetaInvalido(long numeroTarjeta)
+        {
+            return numeroTarjeta == 0 || numeroTarjeta.ToString().Length != 12;
         }
 
         public Task<bool> eliminarCuentaBancaria(int id)

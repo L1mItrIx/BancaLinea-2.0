@@ -11,7 +11,7 @@ namespace BancaEnLinea.API.Controllers
     [ApiController]
     public class TransferenciasController : ControllerBase
     {
-  private readonly IGestionTransferenciaBW gestionTransferenciaBW;
+        private readonly IGestionTransferenciaBW gestionTransferenciaBW;
         private readonly IGestionCuentaBancariaDA gestionCuentaBancariaDA;
 
         public TransferenciasController(
@@ -100,180 +100,185 @@ var resultado = await gestionTransferenciaBW.obtenerTodasLasTransferencias();
      }
  }
 
-        /// <summary>
-        /// Obtiene transferencias enviadas por un cliente con información de monedas
-   /// </summary>
-        [HttpGet("ObtenerTransferenciasPorCliente/{idCliente}")]
+      /// <summary>
+      /// Obtiene transferencias enviadas por un cliente con información de monedas
+    /// </summary>
+     [HttpGet("ObtenerTransferenciasPorCliente/{idCliente}")]
    public async Task<ActionResult> ObtenerTransferenciasPorCliente(int idCliente)
+        {
+     try
    {
-  try
- {
-       Console.WriteLine($"?? Obteniendo transferencias enviadas para cliente {idCliente}");
-        
+                Console.WriteLine($"?? Obteniendo transferencias enviadas para cliente {idCliente}");
+       
      var transferencias = await gestionTransferenciaBW.obtenerTransferenciasPorCliente(idCliente);
-    
-       var transferenciasConInfo = new List<TransferenciaResponse>();
+   var transferenciasConInfo = new List<TransferenciaResponse>();
 
-        foreach (var t in transferencias)
+  foreach (var t in transferencias)
   {
-             // Obtener cuenta origen
- var cuentaOrigen = await gestionCuentaBancariaDA.obtenerCuentaBancariaPorId(t.IdCuentaBancariaOrigen);
-       
-          // Obtener cuenta destino (si existe en el sistema)
-       var cuentaDestino = await gestionCuentaBancariaDA.obtenerCuentaBancariaPorNumeroTarjeta(t.NumeroCuentaDestino);
-   
-         // Determinar si hubo conversión
-            bool requiereConversion = cuentaDestino != null && cuentaOrigen.Moneda != cuentaDestino.Moneda;
-          
-         // Calcular monto recibido (con conversión si aplica)
-       long? montoRecibido = null;
-    decimal? tipoCambio = null;
-  
-             if (cuentaDestino != null)
-         {
-     montoRecibido = ReglasDeTransferencia.calcularMontoDestino(
-              t.Monto,
-       cuentaOrigen.Moneda,
-        cuentaDestino.Moneda);
-         
-        if (requiereConversion)
-           {
-     tipoCambio = cuentaOrigen.Moneda == Moneda.USD 
-  ? ReglasDeConversionMoneda.obtenerTipoCambioUsdACrc()
-          : ReglasDeConversionMoneda.obtenerTipoCambioCrcAUsd();
-       }
-         }
-
-          transferenciasConInfo.Add(new TransferenciaResponse
-      {
-     Referencia = t.Referencia,
-              NumeroCuentaDestino = t.NumeroCuentaDestino,
-            FechaCreacion = t.FechaCreacion,
- FechaEjecucion = t.FechaEjecucion,
-   Estado = t.Estado,
-    EstadoTexto = t.Estado.ToString(),
-      Descripcion = t.Descripcion,
-       
-  NumeroCuentaOrigen = cuentaOrigen.NumeroTarjeta,
-        MonedaOrigen = cuentaOrigen.Moneda,
-  MonedaOrigenTexto = cuentaOrigen.Moneda == Moneda.CRC ? "CRC" : "USD",
-     
-          MontoEnviado = t.Monto,
-               ComisionEnviada = t.Comision,
-        TotalDebitado = t.MontoTotal,
-        
-         RequiereConversion = requiereConversion,
-        MonedaDestino = cuentaDestino?.Moneda,
-  MonedaDestinoTexto = cuentaDestino?.Moneda == Moneda.CRC ? "CRC" : cuentaDestino?.Moneda == Moneda.USD ? "USD" : null,
-    MontoRecibido = montoRecibido,
-   TipoCambioAplicado = tipoCambio
-        });
-    }
+           var transferenciaResponse = await construirTransferenciaResponse(t);
+        transferenciasConInfo.Add(transferenciaResponse);
+      }
 
         Console.WriteLine($"? Se encontraron {transferenciasConInfo.Count} transferencias enviadas");
-        return Ok(new { success = true, data = transferenciasConInfo, total = transferenciasConInfo.Count });
-    }
-    catch (Exception ex)
-    {
-        Console.WriteLine($"? ERROR: {ex.Message}");
-        return StatusCode(500, new { success = false, message = $"Error interno: {ex.Message}" });
-    }
-}
+     return Ok(new { success = true, data = transferenciasConInfo, total = transferenciasConInfo.Count });
+            }
+          catch (Exception ex)
+            {
+       Console.WriteLine($"? ERROR: {ex.Message}");
+  return StatusCode(500, new { success = false, message = $"Error interno: {ex.Message}" });
+            }
+        }
 
-/// <summary>
-/// Obtiene transferencias enviadas por un cliente - ENDPOINT ADICIONAL
-/// Mismo que ObtenerTransferenciasPorCliente pero con nombre más descriptivo
-/// </summary>
-[HttpGet("ObtenerTransferenciasEnviadas/{idCliente}")]
+        private async Task<TransferenciaResponse> construirTransferenciaResponse(Transferencia t)
+        {
+            var cuentaOrigen = await gestionCuentaBancariaDA.obtenerCuentaBancariaPorId(t.IdCuentaBancariaOrigen);
+            var cuentaDestino = await gestionCuentaBancariaDA.obtenerCuentaBancariaPorNumeroTarjeta(t.NumeroCuentaDestino);
+
+            var infoConversion = calcularInformacionConversion(t, cuentaOrigen, cuentaDestino);
+
+  return new TransferenciaResponse
+ {
+             Referencia = t.Referencia,
+         NumeroCuentaDestino = t.NumeroCuentaDestino,
+                FechaCreacion = t.FechaCreacion,
+             FechaEjecucion = t.FechaEjecucion,
+            Estado = t.Estado,
+         EstadoTexto = t.Estado.ToString(),
+      Descripcion = t.Descripcion,
+  NumeroCuentaOrigen = cuentaOrigen.NumeroTarjeta,
+      MonedaOrigen = cuentaOrigen.Moneda,
+          MonedaOrigenTexto = cuentaOrigen.Moneda == Moneda.CRC ? "CRC" : "USD",
+           MontoEnviado = t.Monto,
+    ComisionEnviada = t.Comision,
+        TotalDebitado = t.MontoTotal,
+    RequiereConversion = infoConversion.requiereConversion,
+                MonedaDestino = infoConversion.monedaDestino,
+                MonedaDestinoTexto = infoConversion.monedaDestinoTexto,
+       MontoRecibido = infoConversion.montoRecibido,
+      TipoCambioAplicado = infoConversion.tipoCambio
+   };
+  }
+
+        private (bool requiereConversion, Moneda? monedaDestino, string monedaDestinoTexto, long? montoRecibido, decimal? tipoCambio) 
+            calcularInformacionConversion(Transferencia t, CuentaBancaria cuentaOrigen, CuentaBancaria cuentaDestino)
+     {
+       if (cuentaDestino == null)
+      return (false, null, null, null, null);
+
+     bool requiereConversion = cuentaOrigen.Moneda != cuentaDestino.Moneda;
+            
+    long montoRecibido = ReglasDeTransferencia.calcularMontoDestino(
+    t.Monto,
+                cuentaOrigen.Moneda,
+      cuentaDestino.Moneda);
+
+       decimal? tipoCambio = null;
+            if (requiereConversion)
+            {
+         tipoCambio = cuentaOrigen.Moneda == Moneda.USD
+       ? ReglasDeConversionMoneda.obtenerTipoCambioUsdACrc()
+ : ReglasDeConversionMoneda.obtenerTipoCambioCrcAUsd();
+  }
+
+            string monedaDestinoTexto = cuentaDestino.Moneda == Moneda.CRC ? "CRC" : "USD";
+
+      return (requiereConversion, cuentaDestino.Moneda, monedaDestinoTexto, montoRecibido, tipoCambio);
+        }
+
+    /// <summary>
+        /// Obtiene transferencias enviadas por un cliente - ENDPOINT ADICIONAL
+        /// Mismo que ObtenerTransferenciasPorCliente pero con nombre más descriptivo
+        /// </summary>
+        [HttpGet("ObtenerTransferenciasEnviadas/{idCliente}")]
 public async Task<ActionResult> ObtenerTransferenciasEnviadas(int idCliente)
-{
-    // Reutilizar la misma lógica del endpoint anterior
-    return await ObtenerTransferenciasPorCliente(idCliente);
-}
+        {
+       return await ObtenerTransferenciasPorCliente(idCliente);
+      }
 
         /// <summary>
         /// Obtiene transferencias recibidas por un cliente con información de conversión
-      /// </summary>
-        [HttpGet("ObtenerTransferenciasRecibidas/{idCliente}")]
+        /// </summary>
+    [HttpGet("ObtenerTransferenciasRecibidas/{idCliente}")]
         public async Task<ActionResult> ObtenerTransferenciasRecibidas(int idCliente)
         {
             try
             {
-        Console.WriteLine($"?? Obteniendo transferencias recibidas para cliente {idCliente}");
-        
-        var transferenciasRecibidas = await gestionTransferenciaBW.obtenerTransferenciasRecibidas(idCliente);
-      
-        var transferenciasConInfo = new List<object>();
-
- foreach (var tr in transferenciasRecibidas)
-        {
-            // Obtener cuenta origen por número de cuenta
-   var cuentaOrigen = await gestionCuentaBancariaDA.obtenerCuentaBancariaPorNumeroTarjeta(tr.CuentaOrigen);
- 
-            if (cuentaOrigen != null)
- {
-      // Obtener todas las cuentas del cliente para encontrar en cuál recibió
-           var cuentasCliente = await gestionCuentaBancariaDA.obtenerCuentasBancarias(idCliente);
-             
-   // Por ahora, asumimos que recibió en la primera cuenta activa que encuentre
-           // En el futuro, podrías guardar el IdCuentaDestino en la transferencia
-        var tuCuenta = cuentasCliente.FirstOrDefault();
-            
-     if (tuCuenta != null)
-           {
-    // Determinar si hubo conversión
-        bool huboConversion = cuentaOrigen.Moneda != tuCuenta.Moneda;
-      
-          // Calcular monto recibido en tu moneda
-   long montoRecibido = ReglasDeTransferencia.calcularMontoDestino(
-    tr.Monto,
-              cuentaOrigen.Moneda,
-        tuCuenta.Moneda);
-     
-      decimal? tipoCambio = null;
-         if (huboConversion)
-        {
-tipoCambio = cuentaOrigen.Moneda == Moneda.USD 
-              ? ReglasDeConversionMoneda.obtenerTipoCambioUsdACrc()
-          : ReglasDeConversionMoneda.obtenerTipoCambioCrcAUsd();
-  }
-
-           transferenciasConInfo.Add(new
-    {
-     referencia = tr.Referencia,
-         numeroCuentaOrigen = tr.CuentaOrigen,
-         remitente = tr.Remitente,
-       fechaRecepcion = tr.FechaRecepcion,
-  descripcion = tr.Descripcion,
+ Console.WriteLine($"?? Obteniendo transferencias recibidas para cliente {idCliente}");
    
-          monedaOrigen = cuentaOrigen.Moneda,
-      monedaOrigenTexto = cuentaOrigen.Moneda == Moneda.CRC ? "CRC" : "USD",
-       monedaTuCuenta = tuCuenta.Moneda,
-        monedaTuCuentaTexto = tuCuenta.Moneda == Moneda.CRC ? "CRC" : "USD",
-           
-   montoEnviadoPorRemitente = tr.Monto,
-              montoRecibidoEnTuCuenta = montoRecibido,
-       
- huboConversion = huboConversion,
-             tipoCambioAplicado = tipoCambio,
-    
-               // Información adicional útil
-            simboloMonedaOrigen = cuentaOrigen.Moneda == Moneda.CRC ? "?" : "$",
-       simboloMonedaTuCuenta = tuCuenta.Moneda == Moneda.CRC ? "?" : "$"
-     });
-     }
-      }
-  }
+        var transferenciasRecibidas = await gestionTransferenciaBW.obtenerTransferenciasRecibidas(idCliente);
+    var transferenciasConInfo = new List<object>();
 
-        Console.WriteLine($"? Se encontraron {transferenciasConInfo.Count} transferencias recibidas");
-        return Ok(new { success = true, data = transferenciasConInfo, total = transferenciasConInfo.Count });
-    }
-    catch (Exception ex)
+              foreach (var tr in transferenciasRecibidas)
     {
-        Console.WriteLine($"? ERROR: {ex.Message}");
-   return StatusCode(500, new { success = false, message = $"Error interno: {ex.Message}" });
-    }
+   var transferenciaInfo = await construirTransferenciaRecibidaInfo(tr, idCliente);
+     if (transferenciaInfo != null)
+       transferenciasConInfo.Add(transferenciaInfo);
 }
+
+   Console.WriteLine($"? Se encontraron {transferenciasConInfo.Count} transferencias recibidas");
+    return Ok(new { success = true, data = transferenciasConInfo, total = transferenciasConInfo.Count });
+            }
+       catch (Exception ex)
+     {
+                Console.WriteLine($"? ERROR: {ex.Message}");
+                return StatusCode(500, new { success = false, message = $"Error interno: {ex.Message}" });
+  }
+        }
+
+        private async Task<object> construirTransferenciaRecibidaInfo(TransferenciaRecibida tr, int idCliente)
+    {
+var cuentaOrigen = await gestionCuentaBancariaDA.obtenerCuentaBancariaPorNumeroTarjeta(tr.CuentaOrigen);
+            if (cuentaOrigen == null)
+       return null;
+
+       var cuentasCliente = await gestionCuentaBancariaDA.obtenerCuentasBancarias(idCliente);
+   var tuCuenta = cuentasCliente.FirstOrDefault();
+
+      if (tuCuenta == null)
+        return null;
+
+       var datosConversion = calcularDatosConversionRecibida(tr, cuentaOrigen, tuCuenta);
+
+            return new
+      {
+referencia = tr.Referencia,
+numeroCuentaOrigen = tr.CuentaOrigen,
+        remitente = tr.Remitente,
+     fechaRecepcion = tr.FechaRecepcion,
+           descripcion = tr.Descripcion,
+       monedaOrigen = cuentaOrigen.Moneda,
+       monedaOrigenTexto = cuentaOrigen.Moneda == Moneda.CRC ? "CRC" : "USD",
+           monedaTuCuenta = tuCuenta.Moneda,
+   monedaTuCuentaTexto = tuCuenta.Moneda == Moneda.CRC ? "CRC" : "USD",
+    montoEnviadoPorRemitente = tr.Monto,
+     montoRecibidoEnTuCuenta = datosConversion.montoRecibido,
+     huboConversion = datosConversion.huboConversion,
+      tipoCambioAplicado = datosConversion.tipoCambio,
+           simboloMonedaOrigen = cuentaOrigen.Moneda == Moneda.CRC ? "?" : "$",
+         simboloMonedaTuCuenta = tuCuenta.Moneda == Moneda.CRC ? "?" : "$"
+            };
+        }
+
+        private (long montoRecibido, bool huboConversion, decimal? tipoCambio) 
+            calcularDatosConversionRecibida(TransferenciaRecibida tr, CuentaBancaria cuentaOrigen, CuentaBancaria tuCuenta)
+   {
+            bool huboConversion = cuentaOrigen.Moneda != tuCuenta.Moneda;
+
+        long montoRecibido = ReglasDeTransferencia.calcularMontoDestino(
+      tr.Monto,
+ cuentaOrigen.Moneda,
+     tuCuenta.Moneda);
+
+    decimal? tipoCambio = null;
+          if (huboConversion)
+    {
+    tipoCambio = cuentaOrigen.Moneda == Moneda.USD
+      ? ReglasDeConversionMoneda.obtenerTipoCambioUsdACrc()
+        : ReglasDeConversionMoneda.obtenerTipoCambioCrcAUsd();
+         }
+
+            return (montoRecibido, huboConversion, tipoCambio);
+        }
 
   [HttpPut("CancelarTransferencia/{referencia}")]
         public async Task<ActionResult> CancelarTransferencia(int referencia, [FromQuery] int idCliente)

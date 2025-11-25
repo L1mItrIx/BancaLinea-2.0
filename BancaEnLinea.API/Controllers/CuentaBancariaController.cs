@@ -39,27 +39,7 @@ namespace BancaEnLinea.API.Controllers
             try
             {
                 var cuentas = await gestionCuentaBancariaBW.obtenerCuentasBancarias(idCuenta);
-
-                // Agregar información de tipo en texto y nombre del dueño
-                var cuentasConInfo = cuentas.Select(c => new
-                {
-                    id = c.Id,
-                    numeroTarjeta = c.NumeroTarjeta,
-                    tipo = c.Tipo,
-                    tipoTexto = ObtenerTipoTexto(c.Tipo),
-                    moneda = c.Moneda,
-                    monedaTexto = c.Moneda == Moneda.CRC ? "CRC" : "USD",
-                    simboloMoneda = c.Moneda == Moneda.CRC ? "₡" : "$",
-                    saldo = c.Saldo,
-                    estado = c.Estado,
-                    estadoTexto = ObtenerEstadoTexto(c.Estado),
-                    idCuenta = c.IdCuenta,
-                    // Información del dueño
-                    nombreDueno = c.Cuenta != null
-                        ? $"{c.Cuenta.Nombre} {c.Cuenta.PrimerApellido} {c.Cuenta.SegundoApellido}"
-                        : null
-                }).ToList();
-
+                var cuentasConInfo = mapearCuentasConInformacion(cuentas);
                 return Ok(cuentasConInfo);
             }
             catch (Exception ex)
@@ -74,27 +54,7 @@ namespace BancaEnLinea.API.Controllers
             try
             {
                 var cuentas = await gestionCuentaBancariaBW.obtenerTodasLasCuentasBancarias();
-
-                // Agregar información de tipo en texto y nombre del dueño
-                var cuentasConInfo = cuentas.Select(c => new
-                {
-                    id = c.Id,
-                    numeroTarjeta = c.NumeroTarjeta,
-                    tipo = c.Tipo,
-                    tipoTexto = ObtenerTipoTexto(c.Tipo),
-                    moneda = c.Moneda,
-                    monedaTexto = c.Moneda == Moneda.CRC ? "CRC" : "USD",
-                    simboloMoneda = c.Moneda == Moneda.CRC ? "₡" : "$",
-                    saldo = c.Saldo,
-                    estado = c.Estado,
-                    estadoTexto = ObtenerEstadoTexto(c.Estado),
-                    idCuenta = c.IdCuenta,
-                    // Información del dueño
-                    nombreDueno = c.Cuenta != null
-                        ? $"{c.Cuenta.Nombre} {c.Cuenta.PrimerApellido} {c.Cuenta.SegundoApellido}"
-                        : null
-                }).ToList();
-
+                var cuentasConInfo = mapearCuentasConInformacion(cuentas);
                 return Ok(cuentasConInfo);
             }
             catch (Exception ex)
@@ -135,6 +95,38 @@ namespace BancaEnLinea.API.Controllers
             {
                 return StatusCode(500, $"Error interno en el servidor: {ex.Message}");
             }
+        }
+
+        private List<object> mapearCuentasConInformacion(List<CuentaBancaria> cuentas)
+        {
+            return cuentas.Select(c => mapearCuentaBancariaConInfo(c)).ToList();
+        }
+
+        private object mapearCuentaBancariaConInfo(CuentaBancaria c)
+        {
+            return new
+            {
+                id = c.Id,
+                numeroTarjeta = c.NumeroTarjeta,
+                tipo = c.Tipo,
+                tipoTexto = ObtenerTipoTexto(c.Tipo),
+                moneda = c.Moneda,
+                monedaTexto = c.Moneda == Moneda.CRC ? "CRC" : "USD",
+                simboloMoneda = c.Moneda == Moneda.CRC ? "₡" : "$",
+                saldo = c.Saldo,
+                estado = c.Estado,
+                estadoTexto = ObtenerEstadoTexto(c.Estado),
+                idCuenta = c.IdCuenta,
+                nombreDueno = obtenerNombreCompletoDueno(c.Cuenta)
+            };
+        }
+
+        private string obtenerNombreCompletoDueno(Cuenta cuenta)
+        {
+            if (cuenta == null)
+                return null;
+
+            return $"{cuenta.Nombre} {cuenta.PrimerApellido} {cuenta.SegundoApellido}";
         }
 
         private string ObtenerTipoTexto(TipoCuenta tipo)

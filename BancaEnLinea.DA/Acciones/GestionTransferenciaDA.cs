@@ -168,54 +168,78 @@ SaldoAnterior = transferencia.SaldoAnterior,
  }
 
  private Transferencia MapearTransferencia(TransferenciaDA t)
-  {
-     return new Transferencia
  {
-    Referencia = t.Referencia,
-   IdempotencyKey = t.IdempotencyKey,
-   IdCuentaBancariaOrigen = t.IdCuentaBancariaOrigen,
-    NumeroCuentaDestino = t.NumeroCuentaDestino,
-    Monto = t.Monto,
- Comision = t.Comision,
-     MontoTotal = t.MontoTotal,
-   SaldoAnterior = t.SaldoAnterior,
-    SaldoPosterior = t.SaldoPosterior,
-    FechaCreacion = t.FechaCreacion,
-     FechaEjecucion = t.FechaEjecucion,
-    Estado = t.Estado,
-   Descripcion = t.Descripcion,
-       CuentaBancariaOrigen = t.CuentaBancariaOrigen != null ? new CuentaBancaria
-   {
-  Id = t.CuentaBancariaOrigen.Id,
-        NumeroTarjeta = t.CuentaBancariaOrigen.NumeroTarjeta,
-    Tipo = t.CuentaBancariaOrigen.Tipo,
-     Moneda = t.CuentaBancariaOrigen.Moneda,
-   Saldo = t.CuentaBancariaOrigen.Saldo,
-    Estado = t.CuentaBancariaOrigen.Estado,
-  IdCuenta = t.CuentaBancariaOrigen.IdCuenta,
-   Cuenta = t.CuentaBancariaOrigen.Cuenta != null ? new Cuenta
+     return new Transferencia
      {
-     Id = t.CuentaBancariaOrigen.Cuenta.Id,
-    Telefono = t.CuentaBancariaOrigen.Cuenta.Telefono,
-      Nombre = t.CuentaBancariaOrigen.Cuenta.Nombre,
- PrimerApellido = t.CuentaBancariaOrigen.Cuenta.PrimerApellido,
-          SegundoApellido = t.CuentaBancariaOrigen.Cuenta.SegundoApellido,
-     Correo = t.CuentaBancariaOrigen.Cuenta.Correo,
-     Rol = t.CuentaBancariaOrigen.Cuenta.Rol
-   } : null
-   } : null,
-Aprobador = t.Aprobador != null ? new Cuenta
-{
-     Id = t.Aprobador.Id,
-    Telefono = t.Aprobador.Telefono,
-     Nombre = t.Aprobador.Nombre,
-  PrimerApellido = t.Aprobador.PrimerApellido,
-     SegundoApellido = t.Aprobador.SegundoApellido,
-  Correo = t.Aprobador.Correo,
-        Rol = t.Aprobador.Rol
-     } : null
-      };
-   }
+      Referencia = t.Referencia,
+IdempotencyKey = t.IdempotencyKey,
+     IdCuentaBancariaOrigen = t.IdCuentaBancariaOrigen,
+ NumeroCuentaDestino = t.NumeroCuentaDestino,
+        Monto = t.Monto,
+ Comision = t.Comision,
+    MontoTotal = t.MontoTotal,
+     SaldoAnterior = t.SaldoAnterior,
+    SaldoPosterior = t.SaldoPosterior,
+FechaCreacion = t.FechaCreacion,
+     FechaEjecucion = t.FechaEjecucion,
+Estado = t.Estado,
+       Descripcion = t.Descripcion,
+        CuentaBancariaOrigen = mapearCuentaBancariaOrigen(t.CuentaBancariaOrigen),
+   Aprobador = mapearAprobador(t.Aprobador)
+     };
+        }
+
+   private CuentaBancaria mapearCuentaBancariaOrigen(CuentaBancariaDA cuentaBancariaDA)
+        {
+  if (cuentaBancariaDA == null)
+         return null;
+
+return new CuentaBancaria
+    {
+   Id = cuentaBancariaDA.Id,
+       NumeroTarjeta = cuentaBancariaDA.NumeroTarjeta,
+    Tipo = cuentaBancariaDA.Tipo,
+     Moneda = cuentaBancariaDA.Moneda,
+    Saldo = cuentaBancariaDA.Saldo,
+   Estado = cuentaBancariaDA.Estado,
+     IdCuenta = cuentaBancariaDA.IdCuenta,
+     Cuenta = mapearCuenta(cuentaBancariaDA.Cuenta)
+ };
+    }
+
+    private Cuenta mapearCuenta(CuentaDA cuentaDA)
+        {
+if (cuentaDA == null)
+      return null;
+
+ return new Cuenta
+      {
+ Id = cuentaDA.Id,
+Telefono = cuentaDA.Telefono,
+      Nombre = cuentaDA.Nombre,
+   PrimerApellido = cuentaDA.PrimerApellido,
+    SegundoApellido = cuentaDA.SegundoApellido,
+Correo = cuentaDA.Correo,
+    Rol = cuentaDA.Rol
+   };
+      }
+
+        private Cuenta mapearAprobador(CuentaDA aprobadorDA)
+     {
+ if (aprobadorDA == null)
+     return null;
+
+         return new Cuenta
+      {
+           Id = aprobadorDA.Id,
+   Telefono = aprobadorDA.Telefono,
+  Nombre = aprobadorDA.Nombre,
+            PrimerApellido = aprobadorDA.PrimerApellido,
+     SegundoApellido = aprobadorDA.SegundoApellido,
+     Correo = aprobadorDA.Correo,
+     Rol = aprobadorDA.Rol
+     };
+        }
 
         public async Task<List<TransferenciaRecibida>> obtenerTransferenciasRecibidas(int idCliente)
         {
